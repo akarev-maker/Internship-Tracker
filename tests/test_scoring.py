@@ -75,3 +75,20 @@ def test_blend_weights():
 def test_fit_hash_changes_with_text_and_version():
     assert scoring.fit_hash("a", "v1") != scoring.fit_hash("b", "v1")
     assert scoring.fit_hash("a", "v1") != scoring.fit_hash("a", "v2")
+
+
+# --- gemini_fit --------------------------------------------------------------
+import gemini_fit  # noqa: E402
+
+
+def test_gemini_parse_fit_clamps_and_extracts():
+    score, reason = gemini_fit._parse_fit('{"score": 130, "reason": "strong web"}')
+    assert score == 100
+    assert reason == "strong web"
+    score2, _ = gemini_fit._parse_fit('```json\n{"score": -5, "reason": "weak"}\n```')
+    assert score2 == 0
+
+
+def test_gemini_fit_returns_none_without_key(monkeypatch):
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    assert gemini_fit.gemini_fit("resume", "posting") is None
