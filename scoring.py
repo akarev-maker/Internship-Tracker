@@ -13,6 +13,9 @@ import hashlib
 import logging
 from datetime import date, datetime
 
+import gemini_fit as _gemini
+from store import active_records
+
 logger = logging.getLogger("tracker.scoring")
 
 FIT_WEIGHT = 0.5
@@ -76,3 +79,34 @@ def blend(fit, urgency, location):
 
 def fit_hash(text, profile_version):
     return hashlib.sha256(f"{profile_version}\x00{text}".encode("utf-8")).hexdigest()[:16]
+
+
+def score_store(store, profile, gemini_fn=_gemini.gemini_fit, today=None):
+    """Score every active record in place. Cache by (posting text + profile
+    version); always recompute rank_score since urgency changes daily."""
+    weights = profile.get("weights", {})
+    resume = profile.get("resume", "")
+    version = profile.get("version", "")
+    for rec in active_records(store):
+        text = posting_text(rec)
+        h = fit_hash(text, version)
+        if rec.get("fit_hash") == h and "fit_score" in rec:
+            fit = rec["fit_score"]  # reuse cached fit
+        else:
+            kw_score, kw_reason = keyword_fit(text, weights)
+            result = None
+            if gemini_fn is not None:
+                try:
+                    result = gemini_fn(resume, text)
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("Gemini fit failed for %s: %s", rec.get("id"), exc)
+            if result:
+                fit, reason = int(result[0]), str(result[1])
+            else:
+                fit, reason = kw_score, kw_reason
+            rec["fit_score"] = fit
+            rec["fit_reason"] = reason
+            rec["fit_hash"] = h
+        urgency = urgency_score(rec.get("deadline"), today)
+        location = location_score(rec.get("rank", 2))
+        rec["rank_score"] = round(blend(rec["fit_score"], urgency, location))

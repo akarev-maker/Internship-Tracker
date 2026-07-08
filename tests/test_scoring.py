@@ -92,3 +92,69 @@ def test_gemini_parse_fit_clamps_and_extracts():
 def test_gemini_fit_returns_none_without_key(monkeypatch):
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     assert gemini_fit.gemini_fit("resume", "posting") is None
+
+
+# --- score_store ---------------------------------------------------------------
+import store as store_mod  # noqa: E402
+
+PROFILE = {"weights": WEIGHTS, "boosts": {}, "resume": "web appsec + python",
+           "version": "v1"}
+
+
+def _seed(**kw):
+    store = {}
+    rec = _rec(**kw)
+    rec.update({"id": kw.get("id", "a"), "status": "new"})
+    store[rec["id"]] = rec
+    return store
+
+
+def test_score_store_keyword_when_no_gemini():
+    store = _seed(title="Web Application Security Intern", rank=0,
+                  deadline="")
+    scoring.score_store(store, PROFILE, gemini_fn=lambda *_: None, today=date(2026, 1, 1))
+    rec = store["a"]
+    assert rec["fit_score"] == 33   # only "web application" (5) -> 5/15*100
+    assert "web application" in rec["fit_reason"]
+    assert rec["rank_score"] > 0
+
+
+def test_score_store_gemini_overrides_keyword():
+    store = _seed(title="Generic Security Intern")
+    scoring.score_store(store, PROFILE, gemini_fn=lambda *_: (77, "strong web"),
+                        today=date(2026, 1, 1))
+    assert store["a"]["fit_score"] == 77
+    assert store["a"]["fit_reason"] == "strong web"
+
+
+def test_score_store_falls_back_when_gemini_raises():
+    store = _seed(title="Web Application Security Intern")
+
+    def boom(*_):
+        raise RuntimeError("gemini down")
+
+    scoring.score_store(store, PROFILE, gemini_fn=boom, today=date(2026, 1, 1))
+    assert store["a"]["fit_score"] == 33  # keyword fallback, not a crash
+
+
+def test_score_store_caches_unchanged(monkeypatch):
+    store = _seed(title="Web Application Security Intern")
+    calls = {"n": 0}
+
+    def counting(*_):
+        calls["n"] += 1
+        return (80, "match")
+
+    scoring.score_store(store, PROFILE, gemini_fn=counting, today=date(2026, 1, 1))
+    scoring.score_store(store, PROFILE, gemini_fn=counting, today=date(2026, 1, 2))
+    assert calls["n"] == 1  # second run reused the cached fit
+
+
+def test_score_store_reprices_when_profile_version_changes():
+    store = _seed(title="Web Application Security Intern")
+    scoring.score_store(store, PROFILE, gemini_fn=lambda *_: (10, "x"),
+                        today=date(2026, 1, 1))
+    bumped = dict(PROFILE, version="v2")
+    scoring.score_store(store, bumped, gemini_fn=lambda *_: (90, "y"),
+                        today=date(2026, 1, 1))
+    assert store["a"]["fit_score"] == 90  # re-scored because version changed
