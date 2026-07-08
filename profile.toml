@@ -1,0 +1,37 @@
+# Your skillset. Edit freely — higher weight = matters more to you.
+# Changing this file re-scores every posting once (the cache keys on its hash).
+
+[weights]                 # deterministic keyword floor
+"web application" = 5
+"web app" = 5
+xss = 5
+"sql injection" = 5
+sqli = 5
+"file upload" = 4
+"api" = 4
+burp = 4
+proxy = 3
+pentest = 4
+"penetration test" = 4
+nmap = 3
+metasploit = 3
+enumeration = 3
+python = 3
+fastapi = 3
+bash = 2
+linux = 2
+ctf = 3
+siem = 2
+"incident response" = 2
+"incident handling" = 2
+"traffic analysis" = 2
+"log analysis" = 2
+"blue team" = 2
+"red team" = 3
+
+[boosts]
+massachusetts = true
+
+resume = """
+[resume redacted - supplied via the PROFILE_RESUME secret]
+"""
