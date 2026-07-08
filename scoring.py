@@ -91,7 +91,7 @@ def score_store(store, profile, gemini_fn=_gemini.gemini_fit, today=None):
         text = posting_text(rec)
         h = fit_hash(text, version)
         if rec.get("fit_hash") == h and "fit_score" in rec:
-            fit = rec["fit_score"]  # reuse cached fit
+            pass  # fit is cached on the record; reuse it (rank_score still recomputed below)
         else:
             kw_score, kw_reason = keyword_fit(text, weights)
             result = None

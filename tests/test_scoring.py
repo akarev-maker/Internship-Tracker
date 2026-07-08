@@ -95,8 +95,6 @@ def test_gemini_fit_returns_none_without_key(monkeypatch):
 
 
 # --- score_store ---------------------------------------------------------------
-import store as store_mod  # noqa: E402
-
 PROFILE = {"weights": WEIGHTS, "boosts": {}, "resume": "web appsec + python",
            "version": "v1"}
 
@@ -135,19 +133,26 @@ def test_score_store_falls_back_when_gemini_raises():
 
     scoring.score_store(store, PROFILE, gemini_fn=boom, today=date(2026, 1, 1))
     assert store["a"]["fit_score"] == 33  # keyword fallback, not a crash
+    assert "web application" in store["a"]["fit_reason"]
 
 
 def test_score_store_caches_unchanged(monkeypatch):
-    store = _seed(title="Web Application Security Intern")
+    store = _seed(title="Web Application Security Intern", deadline="2026-01-15")
     calls = {"n": 0}
 
     def counting(*_):
         calls["n"] += 1
         return (80, "match")
 
+    # Run with different today values to verify rank_score recomputes
     scoring.score_store(store, PROFILE, gemini_fn=counting, today=date(2026, 1, 1))
-    scoring.score_store(store, PROFILE, gemini_fn=counting, today=date(2026, 1, 2))
-    assert calls["n"] == 1  # second run reused the cached fit
+    rank_score_1 = store["a"]["rank_score"]
+    scoring.score_store(store, PROFILE, gemini_fn=counting, today=date(2026, 1, 8))
+    rank_score_2 = store["a"]["rank_score"]
+
+    # fit is cached (gemini_fn called only once), but rank_score recomputed
+    assert calls["n"] == 1
+    assert rank_score_1 != rank_score_2
 
 
 def test_score_store_reprices_when_profile_version_changes():
