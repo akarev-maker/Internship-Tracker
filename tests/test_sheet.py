@@ -57,12 +57,34 @@ def test_apply_status_edits_valid_and_invalid():
     assert "ghost" not in store            # unknown id ignored
 
 
+def test_apply_status_edits_rejects_invalid_status_for_known_id():
+    store = {"a": _rec("a", 40)}
+    sheet.apply_status_edits(store, {"a": "bogus"})
+    assert store["a"]["status"] == "new"  # invalid status rejected, original preserved
+
+
 def test_read_status_from_sheet():
     header = sheet.COLUMNS
     row = [""] * len(header)
     row[header.index("ID")] = "a"
     row[header.index("Status")] = "Applied"
     ws = FakeWS([header, row])
+    assert sheet.read_status_from_sheet(ws) == {"a": "applied"}
+
+
+def test_read_status_from_sheet_survives_column_reorder():
+    # Swap Status and ID column positions to test header name lookup, not index
+    reordered_header = list(sheet.COLUMNS)
+    id_idx = reordered_header.index("ID")
+    status_idx = reordered_header.index("Status")
+    reordered_header[id_idx], reordered_header[status_idx] = reordered_header[status_idx], reordered_header[id_idx]
+
+    # Build row with values in reordered positions
+    row = [""] * len(reordered_header)
+    row[reordered_header.index("ID")] = "a"
+    row[reordered_header.index("Status")] = "Applied"
+
+    ws = FakeWS([reordered_header, row])
     assert sheet.read_status_from_sheet(ws) == {"a": "applied"}
 
 
