@@ -2,4 +2,6 @@
 # bumps (supply-chain hardening). Dependabot proposes reviewed updates.
 requests>=2.31.0,<3
 python-dateutil>=2.8.2,<3
-markdown>=3.5,<4
+gspread>=6,<7
+google-auth>=2.23,<3
+google-genai>=1,<2
