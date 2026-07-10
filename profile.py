@@ -17,15 +17,9 @@ def load_profile(path=DEFAULT_PATH):
         raw = f.read()
     data = tomllib.loads(raw.decode("utf-8"))
 
-    # Extract resume from either root level or boosts table
-    resume_value = data.get("resume", "")
-    boosts_data = dict(data.get("boosts", {}))
-    if not resume_value and "resume" in boosts_data:
-        resume_value = boosts_data.pop("resume")
-
     return {
         "weights": {str(k).lower(): int(v) for k, v in data.get("weights", {}).items()},
-        "boosts": boosts_data,
-        "resume": str(resume_value),
+        "boosts": dict(data.get("boosts", {})),
+        "resume": str(data.get("resume", "")),
         "version": hashlib.sha256(raw).hexdigest()[:12],
     }

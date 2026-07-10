@@ -15,9 +15,9 @@ def _write(tmp_path, text):
 def test_load_profile_parses_sections(tmp_path):
     path = _write(
         tmp_path,
+        'resume = "I do web appsec."\n\n'
         '[weights]\n"web application" = 5\nxss = 5\n\n'
-        '[boosts]\nmassachusetts = true\n\n'
-        'resume = "I do web appsec."\n',
+        '[boosts]\nmassachusetts = true\n',
     )
     prof = profile_mod.load_profile(path)
     assert prof["weights"]["web application"] == 5

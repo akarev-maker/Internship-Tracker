@@ -37,6 +37,16 @@ def test_keyword_fit_no_match():
     assert "no profile keywords" in reason.lower()
 
 
+def test_keyword_fit_word_boundary_not_substring():
+    # "api" must NOT match inside "Rapid7"
+    score, reason = scoring.keyword_fit("Security Intern at Rapid7", {"api": 4})
+    assert score == 0
+    assert "no profile keywords" in reason.lower()
+    # but a real standalone occurrence still matches
+    score2, _ = scoring.keyword_fit("REST API Security Intern", {"api": 4})
+    assert score2 > 0
+
+
 # --- urgency ----------------------------------------------------------------
 def test_urgency_none_is_neutral_low():
     assert scoring.urgency_score("") == 20.0

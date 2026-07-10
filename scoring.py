@@ -11,6 +11,7 @@ rank_score = 0.5*fit + 0.3*urgency + 0.2*location  (all on a 0-100 scale)
 
 import hashlib
 import logging
+import re
 from datetime import date, datetime
 
 import gemini_fit as _gemini
@@ -28,7 +29,8 @@ KEYWORD_FIT_TARGET = 15.0
 
 
 def posting_text(rec):
-    """The text we have to match against (titles + USAJOBS's richer fields)."""
+    """The text we have to match against (the fields the record actually
+    carries: title, company, term, location)."""
     parts = [rec.get("title", ""), rec.get("company", ""),
              str(rec.get("term", "")), rec.get("location_str", "")]
     return " ".join(p for p in parts if p)
@@ -37,7 +39,8 @@ def posting_text(rec):
 def keyword_fit(text, weights):
     """Deterministic 0-100 fit from weighted keyword overlap + a reason string."""
     low = text.lower()
-    matched = [(kw, w) for kw, w in weights.items() if kw in low]
+    matched = [(kw, w) for kw, w in weights.items()
+               if re.search(rf"\b{re.escape(kw)}\b", low)]
     if not matched:
         return 0, "no profile keywords matched"
     total = sum(w for _, w in matched)

@@ -1,6 +1,10 @@
 # Your skillset. Edit freely — higher weight = matters more to you.
 # Changing this file re-scores every posting once (the cache keys on its hash).
 
+resume = """
+[resume redacted - supplied via the PROFILE_RESUME secret]
+"""
+
 [weights]                 # deterministic keyword floor
 "web application" = 5
 "web app" = 5
@@ -31,7 +35,3 @@ siem = 2
 
 [boosts]
 massachusetts = true
-
-resume = """
-[resume redacted - supplied via the PROFILE_RESUME secret]
-"""
