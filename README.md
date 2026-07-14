@@ -16,7 +16,10 @@ Runs daily via GitHub Actions.
 3. `scoring.py` scores each posting against your `profile.toml`:
    - a deterministic **keyword** floor (always), and
    - a **Gemini** fit score + one-line rationale when `GEMINI_API_KEY` is set
-     (it overrides the keyword score and adds the "Why" column).
+     (batched ~10 postings per request, most promising first, capped per run
+     to respect free-tier limits — it overrides the keyword score and adds
+     the "Why" column; anything unscored keeps the keyword floor and upgrades
+     on later runs).
    Then it blends `rank = 0.5·fit + 0.3·urgency + 0.2·location`.
 4. `sheet.py` rewrites the Google Sheet, best-first.
 

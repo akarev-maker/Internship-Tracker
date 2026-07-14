@@ -103,19 +103,6 @@ def test_fit_hash_changes_with_text_and_version():
 import gemini_fit  # noqa: E402
 
 
-def test_gemini_parse_fit_clamps_and_extracts():
-    score, reason = gemini_fit._parse_fit('{"score": 130, "reason": "strong web"}')
-    assert score == 100
-    assert reason == "strong web"
-    score2, _ = gemini_fit._parse_fit('```json\n{"score": -5, "reason": "weak"}\n```')
-    assert score2 == 0
-
-
-def test_gemini_fit_returns_none_without_key(monkeypatch):
-    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
-    assert gemini_fit.gemini_fit("resume", "posting") is None
-
-
 def test_parse_batch_maps_clamps_and_filters():
     text = ('[{"id": "a", "score": 130, "reason": "strong"},'
             ' {"id": "b", "score": -5, "reason": "weak"},'
