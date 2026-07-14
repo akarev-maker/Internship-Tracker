@@ -158,6 +158,22 @@ def _seed(**kw):
     return store
 
 
+def _gem(score, reason):
+    """Batch-shaped fake: scores every posting it is asked about."""
+    def fn(resume, items):
+        return {it["id"]: (score, reason) for it in items}
+    return fn
+
+
+def _multi(*pid_rank_pairs, title="Web Application Security Intern"):
+    store = {}
+    for pid, rank in pid_rank_pairs:
+        rec = _rec(title=title, rank=rank)
+        rec.update({"id": pid, "status": "new"})
+        store[pid] = rec
+    return store
+
+
 def test_score_store_keyword_when_no_gemini():
     store = _seed(title="Web Application Security Intern", rank=0,
                   deadline="")
@@ -165,15 +181,17 @@ def test_score_store_keyword_when_no_gemini():
     rec = store["a"]
     assert rec["fit_score"] == 33   # only "web application" (5) -> 5/15*100
     assert "web application" in rec["fit_reason"]
+    assert rec["fit_source"] == "keyword"
     assert rec["rank_score"] > 0
 
 
 def test_score_store_gemini_overrides_keyword():
     store = _seed(title="Generic Security Intern")
-    scoring.score_store(store, PROFILE, gemini_fn=lambda *_: (77, "strong web"),
+    scoring.score_store(store, PROFILE, gemini_fn=_gem(77, "strong web"),
                         today=date(2026, 1, 1))
     assert store["a"]["fit_score"] == 77
     assert store["a"]["fit_reason"] == "strong web"
+    assert store["a"]["fit_source"] == "gemini"
 
 
 def test_score_store_falls_back_when_gemini_raises():
@@ -187,13 +205,13 @@ def test_score_store_falls_back_when_gemini_raises():
     assert "web application" in store["a"]["fit_reason"]
 
 
-def test_score_store_caches_unchanged(monkeypatch):
+def test_score_store_caches_unchanged():
     store = _seed(title="Web Application Security Intern", deadline="2026-01-15")
     calls = {"n": 0}
 
-    def counting(*_):
+    def counting(resume, items):
         calls["n"] += 1
-        return (80, "match")
+        return {it["id"]: (80, "match") for it in items}
 
     # Run with different today values to verify rank_score recomputes
     scoring.score_store(store, PROFILE, gemini_fn=counting, today=date(2026, 1, 1))
@@ -212,7 +230,7 @@ def test_score_store_upgrades_keyword_fit_when_gemini_appears():
     store = _seed(title="Web Application Security Intern")
     scoring.score_store(store, PROFILE, gemini_fn=lambda *_: None, today=date(2026, 1, 1))
     assert store["a"]["fit_source"] == "keyword"
-    scoring.score_store(store, PROFILE, gemini_fn=lambda *_: (88, "strong web"),
+    scoring.score_store(store, PROFILE, gemini_fn=_gem(88, "strong web"),
                         today=date(2026, 1, 1))
     assert store["a"]["fit_score"] == 88
     assert store["a"]["fit_source"] == "gemini"
@@ -236,9 +254,57 @@ def test_score_store_applied_gets_no_urgency_boost():
 
 def test_score_store_reprices_when_profile_version_changes():
     store = _seed(title="Web Application Security Intern")
-    scoring.score_store(store, PROFILE, gemini_fn=lambda *_: (10, "x"),
+    scoring.score_store(store, PROFILE, gemini_fn=_gem(10, "x"),
                         today=date(2026, 1, 1))
     bumped = dict(PROFILE, version="v2")
-    scoring.score_store(store, bumped, gemini_fn=lambda *_: (90, "y"),
+    scoring.score_store(store, bumped, gemini_fn=_gem(90, "y"),
                         today=date(2026, 1, 1))
     assert store["a"]["fit_score"] == 90  # re-scored because version changed
+
+
+def test_score_store_batches_priority_order_and_budget(monkeypatch):
+    monkeypatch.setattr(scoring, "BATCH_SIZE", 2)
+    monkeypatch.setattr(scoring, "MAX_GEMINI_REQUESTS_PER_RUN", 1)
+    # same keyword fit everywhere; location differentiates preliminary rank
+    store = _multi(("elsewhere", 2), ("ma", 0), ("remote", 1))
+    seen = []
+
+    def fake(resume, items):
+        seen.append([it["id"] for it in items])
+        return {it["id"]: (90, "gem") for it in items}
+
+    scoring.score_store(store, PROFILE, gemini_fn=fake, today=date(2026, 1, 1))
+    # one request (budget=1) of two postings (batch=2), best locations first
+    assert seen == [["ma", "remote"]]
+    assert store["ma"]["fit_source"] == "gemini"
+    assert store["remote"]["fit_source"] == "gemini"
+    assert store["elsewhere"]["fit_source"] == "keyword"  # over budget — next run
+
+
+def test_score_store_stops_after_first_batch_failure(monkeypatch):
+    monkeypatch.setattr(scoring, "BATCH_SIZE", 1)
+    store = _multi(("a", 0), ("b", 1), ("c", 2))
+    calls = {"n": 0}
+
+    def boom(resume, items):
+        calls["n"] += 1
+        raise RuntimeError("429 rate limited")
+
+    scoring.score_store(store, PROFILE, gemini_fn=boom, today=date(2026, 1, 1))
+    assert calls["n"] == 1  # gave up after the first failure
+    assert all(r["fit_source"] == "keyword" for r in store.values())
+
+
+def test_score_store_partial_batch_response_retries_next_run():
+    store = _multi(("a", 0), ("b", 0))
+
+    def only_a(resume, items):
+        return {"a": (70, "gem")}
+
+    scoring.score_store(store, PROFILE, gemini_fn=only_a, today=date(2026, 1, 1))
+    assert store["a"]["fit_source"] == "gemini"
+    assert store["b"]["fit_source"] == "keyword"   # missing from the response
+    scoring.score_store(store, PROFILE, gemini_fn=_gem(60, "late"),
+                        today=date(2026, 1, 1))
+    assert store["b"]["fit_source"] == "gemini"    # retried and upgraded
+    assert store["a"]["fit_score"] == 70           # already final, not re-sent
