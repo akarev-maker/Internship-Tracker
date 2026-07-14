@@ -80,12 +80,20 @@ Behavior:
   logs `logger.warning` with the company name and continues with the rest —
   same resilience pattern as the existing sources.
 - **Inclusion rule**: title contains `"intern"` (case-insensitive), AND title
-  does not match the non-tech denylist
-  (`marketing, sales, hr, human resources, legal, finance, accounting,
-  recruit, people ops, design`). The company being on the curated list is
-  the security signal — a "Software Engineer Intern" at a security company
-  belongs in the pool; keyword/Gemini fit ranking handles relevance. (The
-  Gemini budget is 300 postings/run — ample headroom.)
+  matches the **security-career allowlist** — the user's goal is pen
+  testing, so the list covers security roles plus the classic entry-path
+  roles into the field:
+  `security, cyber, pentest, pen test, penetration, red team, blue team,
+  appsec, infosec, soc analyst, soc intern, threat, vulnerability, incident,
+  forensic, malware, detection, exploit, identity, iam, grc, network,
+  it intern, information technology, helpdesk, help desk, system
+  administrator, sysadmin, technical support`.
+  Matching is **word-boundary** (the `keyword_fit` regex style), never bare
+  substring — `soc` as a substring would match "aSSOCiate" and `it` would
+  match everything; multi-word entries like `soc analyst` / `it intern`
+  avoid this. Generic engineering interns (e.g. "Data Engineering Intern")
+  are excluded even at security companies. The GitHub-feed filter is
+  unchanged (separate concern, measured as not the bottleneck).
 - **Normalization** to the existing posting shape (`sources.py` docstring):
   - `id`: `"ats:" + sha256(f"{ats}:{slug}:{job_id}")[:16]` — stable across
     runs, no duplicates on re-posts.
@@ -130,8 +138,11 @@ Behavior:
 - Fixture JSON for one Greenhouse board and one Lever board (trimmed real
   response shapes) → parsing + normalization tests (field mapping, id
   format, date conversion, location_str).
-- Inclusion rule: intern-title required; denylist excludes
-  "Marketing Intern"; non-intern titles excluded.
+- Inclusion rule: intern-title required; allowlist admits "Security
+  Engineer Intern", "Penetration Testing Intern", "IT Intern",
+  "SOC Analyst Intern"; excludes "Marketing Intern",
+  "Data Engineering Intern", and "Associate Product Manager Intern"
+  (the `soc`-substring trap); non-intern titles excluded.
 - Id stability: same fixture parsed twice → same ids.
 - Per-board isolation: a fetcher that raises for one board doesn't lose the
   other board's postings.
