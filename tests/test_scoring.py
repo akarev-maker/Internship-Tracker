@@ -4,6 +4,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+import pytest
 import scoring  # noqa: E402
 
 WEIGHTS = {"web application": 5, "xss": 5, "python": 3, "siem": 2}
@@ -113,6 +114,36 @@ def test_gemini_parse_fit_clamps_and_extracts():
 def test_gemini_fit_returns_none_without_key(monkeypatch):
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     assert gemini_fit.gemini_fit("resume", "posting") is None
+
+
+def test_parse_batch_maps_clamps_and_filters():
+    text = ('[{"id": "a", "score": 130, "reason": "strong"},'
+            ' {"id": "b", "score": -5, "reason": "weak"},'
+            ' {"id": "ghost", "score": 50, "reason": "not asked"},'
+            ' {"id": "c", "reason": "missing score"},'
+            ' "junk"]')
+    out = gemini_fit._parse_batch(text, ["a", "b", "c"])
+    # clamped to 0-100; unknown id and malformed entries dropped;
+    # "c" absent -> caller keeps its keyword score
+    assert out == {"a": (100, "strong"), "b": (0, "weak")}
+
+
+def test_parse_batch_strips_markdown_fence():
+    fenced = '```json\n[{"id": "a", "score": 7, "reason": "r"}]\n```'
+    assert gemini_fit._parse_batch(fenced, ["a"]) == {"a": (7, "r")}
+
+
+def test_parse_batch_rejects_non_array_and_empty():
+    with pytest.raises(RuntimeError):
+        gemini_fit._parse_batch('{"id": "a", "score": 7, "reason": "r"}', ["a"])
+    with pytest.raises(RuntimeError):
+        gemini_fit._parse_batch("", ["a"])
+
+
+def test_gemini_fit_batch_returns_none_without_key(monkeypatch):
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    out = gemini_fit.gemini_fit_batch("resume", [{"id": "a", "text": "t"}])
+    assert out is None
 
 
 # --- score_store ---------------------------------------------------------------
