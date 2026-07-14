@@ -113,6 +113,9 @@ def _get_client(key):
     global _client
     if _client is None:
         from google import genai
+        from google.genai import types
 
-        _client = genai.Client(api_key=key)
+        _client = genai.Client(
+            api_key=key, http_options=types.HttpOptions(timeout=60_000)
+        )
     return _client

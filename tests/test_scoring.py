@@ -127,6 +127,18 @@ def test_parse_batch_rejects_non_array_and_empty():
         gemini_fit._parse_batch("", ["a"])
 
 
+def test_batch_prompt_includes_labels_postings_and_resume():
+    prompt = gemini_fit._batch_prompt(
+        "my resume",
+        [{"id": "x1", "text": "Pentest Intern"}, {"id": "x2", "text": "SOC Intern"}],
+    )
+    assert "POSTING x1:" in prompt
+    assert "POSTING x2:" in prompt
+    assert "Pentest Intern" in prompt
+    assert "SOC Intern" in prompt
+    assert "my resume" in prompt
+
+
 def test_gemini_fit_batch_returns_none_without_key(monkeypatch):
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     out = gemini_fit.gemini_fit_batch("resume", [{"id": "a", "text": "t"}])

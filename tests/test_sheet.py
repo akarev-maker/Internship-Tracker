@@ -20,6 +20,7 @@ class FakeWS:
 
     def update(self, range_name=None, values=None, **kwargs):
         self.updated = (range_name, values)
+        self.update_kwargs = kwargs
 
     def batch_clear(self, ranges):
         self.batch_cleared.extend(ranges)
@@ -95,6 +96,8 @@ def test_write_sheet_updates_then_trims_leftover_rows():
     assert ws.updated is not None
     range_name, values = ws.updated
     assert values[0] == sheet.COLUMNS
+    # raw=True keeps untrusted posting/LLM text from being parsed as formulas
+    assert ws.update_kwargs.get("raw") is True
     # header + 1 posting = 2 rows written; everything below is trimmed,
     # but only AFTER the new data is in place (no clear-before-write window)
     assert ws.batch_cleared == ["3:1000"]
