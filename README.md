@@ -31,7 +31,9 @@ more. Editing the file re-scores every posting once.
 Set status **in the Sheet** (the `Status` column). Each run reads your edits back
 into `state/applications.json` before rewriting. Statuses:
 `new · interested · applied · interviewing · offer · rejected · skip`
-(`rejected`/`skip` drop off the sheet).
+(`rejected`/`skip` drop off the sheet). Postings you've already applied to /
+are interviewing for lose their deadline-urgency boost, so untriaged roles
+stay at the top. Don't add your own columns — the sheet is rewritten each run.
 
 ## Setup
 

@@ -47,6 +47,17 @@ def test_keyword_fit_word_boundary_not_substring():
     assert score2 > 0
 
 
+def test_keyword_fit_matches_common_suffixes():
+    # "Penetration Testing Intern" is a canonical title — the boundary match
+    # must tolerate the -ing suffix on both phrase and single-word keywords
+    weights = {"penetration test": 4, "pentest": 4}
+    score, reason = scoring.keyword_fit("Penetration Testing Intern", weights)
+    assert score > 0
+    assert "penetration test" in reason
+    score2, _ = scoring.keyword_fit("Pentesting Intern", {"pentest": 4})
+    assert score2 > 0
+
+
 # --- urgency ----------------------------------------------------------------
 def test_urgency_none_is_neutral_low():
     assert scoring.urgency_score("") == 20.0
@@ -105,8 +116,7 @@ def test_gemini_fit_returns_none_without_key(monkeypatch):
 
 
 # --- score_store ---------------------------------------------------------------
-PROFILE = {"weights": WEIGHTS, "boosts": {}, "resume": "web appsec + python",
-           "version": "v1"}
+PROFILE = {"weights": WEIGHTS, "resume": "web appsec + python", "version": "v1"}
 
 
 def _seed(**kw):
@@ -163,6 +173,34 @@ def test_score_store_caches_unchanged(monkeypatch):
     # fit is cached (gemini_fn called only once), but rank_score recomputed
     assert calls["n"] == 1
     assert rank_score_1 != rank_score_2
+
+
+def test_score_store_upgrades_keyword_fit_when_gemini_appears():
+    # Scored without Gemini (keyword fallback), then Gemini becomes available:
+    # the cached keyword fit must be retried and replaced, not kept forever.
+    store = _seed(title="Web Application Security Intern")
+    scoring.score_store(store, PROFILE, gemini_fn=lambda *_: None, today=date(2026, 1, 1))
+    assert store["a"]["fit_source"] == "keyword"
+    scoring.score_store(store, PROFILE, gemini_fn=lambda *_: (88, "strong web"),
+                        today=date(2026, 1, 1))
+    assert store["a"]["fit_score"] == 88
+    assert store["a"]["fit_source"] == "gemini"
+
+
+def test_score_store_applied_gets_no_urgency_boost():
+    # The sheet ranks what to APPLY to first — a posting already applied to
+    # must not out-rank actionable ones just because its deadline is close.
+    common = {"title": "Web Application Security Intern", "deadline": "2026-01-03"}
+    fresh = _seed(id="a", **common)
+    acted = _seed(id="b", **common)
+    acted["b"]["status"] = "applied"
+    scoring.score_store(fresh, PROFILE, gemini_fn=None, today=date(2026, 1, 1))
+    scoring.score_store(acted, PROFILE, gemini_fn=None, today=date(2026, 1, 1))
+    assert fresh["a"]["rank_score"] > acted["b"]["rank_score"]
+    # applied item's rank carries zero urgency: fit + location only
+    expected = scoring.blend(acted["b"]["fit_score"], 0.0,
+                             scoring.location_score(acted["b"]["rank"]))
+    assert acted["b"]["rank_score"] == expected
 
 
 def test_score_store_reprices_when_profile_version_changes():

@@ -32,6 +32,3 @@ siem = 2
 "log analysis" = 2
 "blue team" = 2
 "red team" = 3
-
-[boosts]
-massachusetts = true

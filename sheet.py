@@ -10,7 +10,7 @@ import json
 import logging
 import os
 
-from scoring import _days_until
+from scoring import days_until
 from store import VALID_STATUSES, active_records
 
 logger = logging.getLogger("tracker.sheet")
@@ -24,7 +24,7 @@ def build_rows(store):
                   reverse=True)
     rows = [list(COLUMNS)]
     for i, r in enumerate(recs, 1):
-        days = _days_until(r.get("deadline"))
+        days = days_until(r.get("deadline"))
         rows.append([
             i,
             r.get("rank_score", 0),
@@ -51,7 +51,7 @@ def apply_status_edits(store, status_by_id):
 
 
 def read_status_from_sheet(worksheet=None):
-    ws = worksheet or _open_worksheet()
+    ws = worksheet or open_worksheet()
     values = ws.get_all_values()
     if not values:
         return {}
@@ -60,6 +60,11 @@ def read_status_from_sheet(worksheet=None):
         id_i = header.index("ID")
         st_i = header.index("Status")
     except ValueError:
+        logger.warning(
+            "Sheet header is missing the ID/Status column(s) — skipping status "
+            "read-back; any Status edits made in the sheet will be lost when it "
+            "is rewritten this run."
+        )
         return {}
     out = {}
     for row in values[1:]:
@@ -72,14 +77,18 @@ def read_status_from_sheet(worksheet=None):
 
 
 def write_sheet(store, worksheet=None):
-    ws = worksheet or _open_worksheet()
+    ws = worksheet or open_worksheet()
     rows = build_rows(store)
-    ws.clear()
-    ws.update(range_name="A1", values=rows)
+    # Overwrite in place, then trim leftover rows from a previously longer
+    # sheet — never blank the sheet before the new data is confirmed written.
+    # raw=True keeps untrusted posting/LLM text from being parsed as formulas.
+    ws.update(range_name="A1", values=rows, raw=True)
+    if ws.row_count > len(rows):
+        ws.batch_clear([f"{len(rows) + 1}:{ws.row_count}"])
     logger.info("Wrote %d posting(s) to the sheet.", len(rows) - 1)
 
 
-def _open_worksheet():
+def open_worksheet():
     import gspread
 
     raw = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON")

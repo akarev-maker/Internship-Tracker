@@ -50,15 +50,27 @@ def _parse_fit(text):
     return score, str(data.get("reason", ""))
 
 
+_client = None
+
+
+def _get_client(key):
+    # One client per run — score_store calls gemini_fit once per posting, and
+    # rebuilding the HTTP transport each time wastes time on large first runs.
+    global _client
+    if _client is None:
+        from google import genai
+
+        _client = genai.Client(api_key=key)
+    return _client
+
+
 def gemini_fit(resume, posting_text):
     key = os.environ.get("GEMINI_API_KEY")
     if not key:
         return None
-    from google import genai
     from google.genai import types
 
-    client = genai.Client(api_key=key)
-    response = client.models.generate_content(
+    response = _get_client(key).models.generate_content(
         model=GEMINI_MODEL,
         contents=[_prompt(resume, posting_text)],
         config=types.GenerateContentConfig(

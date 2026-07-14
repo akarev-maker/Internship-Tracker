@@ -15,7 +15,7 @@ import re
 from datetime import date, datetime
 
 import gemini_fit as _gemini
-from store import active_records
+from store import NEEDS_ACTION_STATUSES, active_records
 
 logger = logging.getLogger("tracker.scoring")
 
@@ -39,8 +39,10 @@ def posting_text(rec):
 def keyword_fit(text, weights):
     """Deterministic 0-100 fit from weighted keyword overlap + a reason string."""
     low = text.lower()
+    # Word-boundary match, tolerating common suffixes so "penetration test"
+    # still hits "Penetration Testing" (but "api" never hits "Rapid7").
     matched = [(kw, w) for kw, w in weights.items()
-               if re.search(rf"\b{re.escape(kw)}\b", low)]
+               if re.search(rf"\b{re.escape(kw)}(?:s|es|ed|er|ers|ing)?\b", low)]
     if not matched:
         return 0, "no profile keywords matched"
     total = sum(w for _, w in matched)
@@ -49,7 +51,7 @@ def keyword_fit(text, weights):
     return score, f"matched: {terms}"
 
 
-def _days_until(deadline_iso, today=None):
+def days_until(deadline_iso, today=None):
     if not deadline_iso:
         return None
     try:
@@ -61,7 +63,7 @@ def _days_until(deadline_iso, today=None):
 
 def urgency_score(deadline_iso, today=None):
     """0-100. No deadline -> neutral-low (20). 0 days -> 100, window -> 40."""
-    days = _days_until(deadline_iso, today)
+    days = days_until(deadline_iso, today)
     if days is None:
         return 20.0
     if days < 0:
@@ -85,31 +87,37 @@ def fit_hash(text, profile_version):
 
 
 def score_store(store, profile, gemini_fn=_gemini.gemini_fit, today=None):
-    """Score every active record in place. Cache by (posting text + profile
-    version); always recompute rank_score since urgency changes daily."""
+    """Score every active record in place.
+
+    Fit is cached by (posting text + profile version), but only a Gemini fit is
+    treated as final — a keyword fit is a fallback, so it is retried each run
+    until Gemini answers (enabling GEMINI_API_KEY later, or an outage ending,
+    upgrades old scores). rank_score is always recomputed: urgency changes
+    daily, and postings already applied to / in interview get no urgency boost
+    (the sheet ranks what to *apply* to first).
+    """
     weights = profile.get("weights", {})
     resume = profile.get("resume", "")
     version = profile.get("version", "")
     for rec in active_records(store):
         text = posting_text(rec)
         h = fit_hash(text, version)
-        if rec.get("fit_hash") == h and "fit_score" in rec:
-            pass  # fit is cached on the record; reuse it (rank_score still recomputed below)
-        else:
-            kw_score, kw_reason = keyword_fit(text, weights)
-            result = None
+        cached = rec.get("fit_hash") == h and "fit_score" in rec
+        if not (cached and rec.get("fit_source") == "gemini"):
+            fit = reason = None
             if gemini_fn is not None:
                 try:
                     result = gemini_fn(resume, text)
+                    if result:
+                        fit, reason = int(result[0]), str(result[1])
                 except Exception as exc:  # noqa: BLE001
                     logger.warning("Gemini fit failed for %s: %s", rec.get("id"), exc)
-            if result:
-                fit, reason = int(result[0]), str(result[1])
-            else:
-                fit, reason = kw_score, kw_reason
-            rec["fit_score"] = fit
-            rec["fit_reason"] = reason
-            rec["fit_hash"] = h
-        urgency = urgency_score(rec.get("deadline"), today)
+            source = "gemini" if fit is not None else "keyword"
+            if fit is None:
+                fit, reason = keyword_fit(text, weights)
+            rec.update({"fit_score": fit, "fit_reason": reason,
+                        "fit_hash": h, "fit_source": source})
+        urgency = (urgency_score(rec.get("deadline"), today)
+                   if rec.get("status") in NEEDS_ACTION_STATUSES else 0.0)
         location = location_score(rec.get("rank", 2))
-        rec["rank_score"] = round(blend(rec["fit_score"], urgency, location))
+        rec["rank_score"] = blend(rec["fit_score"], urgency, location)

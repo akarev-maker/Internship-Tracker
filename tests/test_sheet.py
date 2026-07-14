@@ -4,25 +4,25 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import sheet  # noqa: E402
-import store as store_mod  # noqa: E402
 
 
 class FakeWS:
     """Stands in for a gspread worksheet (no network)."""
 
-    def __init__(self, values=None):
+    def __init__(self, values=None, row_count=1000):
         self._values = values or []
-        self.cleared = False
+        self.row_count = row_count
         self.updated = None
+        self.batch_cleared = []
 
     def get_all_values(self):
         return self._values
 
-    def clear(self):
-        self.cleared = True
-
     def update(self, range_name=None, values=None, **kwargs):
         self.updated = (range_name, values)
+
+    def batch_clear(self, ranges):
+        self.batch_cleared.extend(ranges)
 
 
 def _rec(pid, rank_score, status="new", title="Intern"):
@@ -88,11 +88,21 @@ def test_read_status_from_sheet_survives_column_reorder():
     assert sheet.read_status_from_sheet(ws) == {"a": "applied"}
 
 
-def test_write_sheet_clears_and_updates():
+def test_write_sheet_updates_then_trims_leftover_rows():
     store = {"b": _rec("b", 90)}
-    ws = FakeWS()
+    ws = FakeWS(row_count=1000)
     sheet.write_sheet(store, worksheet=ws)
-    assert ws.cleared is True
     assert ws.updated is not None
     range_name, values = ws.updated
     assert values[0] == sheet.COLUMNS
+    # header + 1 posting = 2 rows written; everything below is trimmed,
+    # but only AFTER the new data is in place (no clear-before-write window)
+    assert ws.batch_cleared == ["3:1000"]
+
+
+def test_write_sheet_skips_trim_when_nothing_below():
+    store = {"b": _rec("b", 90)}
+    ws = FakeWS(row_count=2)
+    sheet.write_sheet(store, worksheet=ws)
+    assert ws.updated is not None
+    assert ws.batch_cleared == []

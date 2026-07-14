@@ -12,7 +12,7 @@ import traceback
 import scoring
 import sheet
 import sources
-from profile import load_profile
+from user_profile import load_profile
 from store import load_store, merge_postings, save_store
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
@@ -21,7 +21,7 @@ logger = logging.getLogger("tracker")
 
 def main():
     prof = load_profile()
-    worksheet = sheet._open_worksheet()
+    worksheet = sheet.open_worksheet()
 
     store = load_store()
     # 1) fold the user's in-sheet Status edits back into the durable store.
