@@ -18,6 +18,8 @@ import os
 
 from dateutil import parser as dateparser
 
+import ats_boards
+
 from util import SESSION, USER_AGENT, location_rank, strip_html
 
 logger = logging.getLogger("tracker.sources")
@@ -44,7 +46,8 @@ SECURITY_KEYWORDS = (
 USAJOBS_URL = "https://data.usajobs.gov/api/search"
 USAJOBS_QUERIES = [
     ("penetration tester intern", None),
-    ("cybersecurity intern", "Massachusetts"),
+    ("cybersecurity intern", None),
+    ("information security intern", None),
     ("cybersecurity student trainee", None),
     ("information technology student trainee", "Massachusetts"),
 ]
@@ -161,10 +164,20 @@ def fetch_usajobs():
     return postings
 
 
+def _safe(fetcher, label):
+    try:
+        return fetcher()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Source '%s' failed entirely: %s", label, exc)
+        return []
+
+
 def fetch_all_postings():
-    """All sources merged and deduped by id."""
+    """All sources merged and deduped by id (first source wins)."""
     postings, seen = [], set()
-    for src in (fetch_usajobs(), fetch_github_lists()):
+    for src in (_safe(fetch_usajobs, "USAJOBS"),
+                _safe(fetch_github_lists, "GitHub lists"),
+                _safe(ats_boards.fetch_ats_postings, "ATS boards")):
         for p in src:
             if p["id"] in seen:
                 continue

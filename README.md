@@ -9,8 +9,10 @@ Runs daily via GitHub Actions.
 
 ## How it works
 
-1. `sources.py` fetches postings from curated GitHub internship lists and
-   **USAJOBS** (federal roles, which expose a real `ApplicationCloseDate`).
+1. `sources.py` fetches postings from curated GitHub internship lists,
+   **USAJOBS** (federal roles, which expose a real `ApplicationCloseDate`),
+   and **security-company ATS boards** (Greenhouse/Lever) — edit
+   `companies.toml` to add or remove companies.
 2. `store.py` folds them into a persistent store (`state/applications.json`),
    remembering your **status** and **notes** across runs.
 3. `scoring.py` scores each posting against your `profile.toml`:

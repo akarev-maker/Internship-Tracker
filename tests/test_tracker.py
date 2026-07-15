@@ -77,3 +77,35 @@ def test_safe_url_and_md_escape():
     assert util.safe_url("https://ok.com") == "https://ok.com"
     assert "\\[" in util.md_escape("a [b](c)")
     assert "<img" not in util.strip_html("x <img onerror=1> y")
+
+
+def test_usajobs_queries_tuned():
+    assert ("cybersecurity intern", None) in sources.USAJOBS_QUERIES
+    assert ("information security intern", None) in sources.USAJOBS_QUERIES
+    assert ("cybersecurity intern", "Massachusetts") not in sources.USAJOBS_QUERIES
+    assert len(sources.USAJOBS_QUERIES) <= 6
+
+
+def test_fetch_all_postings_includes_ats_and_dedupes(monkeypatch):
+    a = {"id": "x", "title": "A", "deadline": ""}
+    dup = {"id": "x", "title": "A-dup", "deadline": ""}
+    b = {"id": "y", "title": "B", "deadline": ""}
+    monkeypatch.setattr(sources, "fetch_usajobs", lambda: [a])
+    monkeypatch.setattr(sources, "fetch_github_lists", lambda: [dup])
+    monkeypatch.setattr(sources.ats_boards, "fetch_ats_postings", lambda: [b])
+    out = sources.fetch_all_postings()
+    assert [p["id"] for p in out] == ["x", "y"]
+    assert out[0]["title"] == "A"  # first source wins the dup
+
+
+def test_fetch_all_postings_survives_ats_failure(monkeypatch):
+    monkeypatch.setattr(sources, "fetch_usajobs", lambda: [])
+    monkeypatch.setattr(sources, "fetch_github_lists",
+                        lambda: [{"id": "y", "title": "B", "deadline": ""}])
+
+    def boom():
+        raise RuntimeError("ats exploded")
+
+    monkeypatch.setattr(sources.ats_boards, "fetch_ats_postings", boom)
+    out = sources.fetch_all_postings()
+    assert [p["id"] for p in out] == ["y"]
