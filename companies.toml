@@ -57,3 +57,27 @@ slug = "chainguard"
 [[greenhouse]]
 name = "Tailscale"
 slug = "tailscale"
+
+[[greenhouse]]
+name = "Wiz"
+slug = "wizinc"
+
+[[greenhouse]]
+name = "SentinelOne"
+slug = "sentinellabs"
+
+[[greenhouse]]
+name = "Netskope"
+slug = "netskope"
+
+[[greenhouse]]
+name = "Recorded Future"
+slug = "recordedfuture"
+
+[[greenhouse]]
+name = "Veracode"
+slug = "veracode"
+
+[[greenhouse]]
+name = "KnowBe4"
+slug = "knowbe4"
