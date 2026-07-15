@@ -47,6 +47,17 @@ def test_relevant_intern_title_requires_internship():
     assert not ats_boards.relevant_intern_title("Internal IT Support Specialist")
 
 
+def test_relevant_intern_title_compound_and_internship_forms():
+    # "cybersecurity" is one word — boundary matching on "cyber"/"security" misses it
+    assert ats_boards.relevant_intern_title("Cybersecurity Internship - Summer 2027")
+    assert ats_boards.relevant_intern_title("Cybersecurity Intern")
+    # "-ship" forms of the entry-path titles
+    assert ats_boards.relevant_intern_title("IT Internship")
+    assert ats_boards.relevant_intern_title("SOC Internship")
+    # normalization must not create false positives
+    assert not ats_boards.relevant_intern_title("Internship Program Manager")
+
+
 # --- parsers -----------------------------------------------------------------
 def test_parse_greenhouse_fixture():
     out = ats_boards._parse_greenhouse("Acme Sec", "acmesec", GH_DATA)
@@ -91,6 +102,31 @@ def test_load_companies(tmp_path):
 
 def test_load_companies_missing_file_is_empty(tmp_path):
     assert ats_boards.load_companies(str(tmp_path / "nope.toml")) == []
+
+
+def test_load_companies_logs_malformed_entry(tmp_path, caplog):
+    p = tmp_path / "companies.toml"
+    p.write_text('[[greenhouse]]\nname = "A"\nslug = "a"\n\n'
+                 '[[greenhouse]]\nname = "NoSlug"\n', encoding="utf-8")
+    with caplog.at_level("WARNING"):
+        boards = ats_boards.load_companies(str(p))
+    assert boards == [{"ats": "greenhouse", "name": "A", "slug": "a"}]
+    assert any("malformed" in rec.message.lower() for rec in caplog.records)
+
+
+# --- missing job ids ----------------------------------------------------------
+GH_DATA_MISSING_ID = {"jobs": [
+    {"title": "Security Engineer Intern", "absolute_url": "https://x/gh/noid-1",
+     "location": {"name": "Boston, MA"}, "updated_at": ""},
+    {"id": "", "title": "Security Analyst Intern", "absolute_url": "https://x/gh/noid-2",
+     "location": {"name": "Remote"}, "updated_at": ""},
+]}
+
+
+def test_parse_greenhouse_skips_jobs_with_missing_id():
+    # Both jobs are relevant but neither has a usable id; skipped, not id-collided.
+    out = ats_boards._parse_greenhouse("Acme Sec", "acmesec", GH_DATA_MISSING_ID)
+    assert out == []
 
 
 # --- fetch: per-board error isolation ---------------------------------------

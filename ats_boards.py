@@ -27,9 +27,9 @@ LEVER_URL = "https://api.lever.co/v0/postings/{slug}?mode=json"
 # Security roles plus the classic entry-path roles into the field
 # (the user's target: pen testing). Word-boundary matched — never substring.
 CAREER_ALLOWLIST = (
-    "security", "cyber", "pentest", "pen test", "penetration", "red team",
-    "blue team", "appsec", "infosec", "soc analyst", "soc intern", "threat",
-    "vulnerability", "incident", "forensic", "malware", "detection",
+    "security", "cyber", "cybersecurity", "pentest", "pen test", "penetration",
+    "red team", "blue team", "appsec", "infosec", "soc analyst", "soc intern",
+    "threat", "vulnerability", "incident", "forensic", "malware", "detection",
     "exploit", "identity", "iam", "grc", "network", "it intern",
     "information technology", "helpdesk", "help desk",
     "system administrator", "sysadmin", "technical support",
@@ -39,8 +39,12 @@ CAREER_ALLOWLIST = (
 def relevant_intern_title(title):
     """Internship + security-career match. \\bintern(ship)?s?\\b avoids
     matching "internal"; the allowlist uses word_match so "soc" can't fire
-    inside "Associate"."""
+    inside "Associate". "-ship" forms ("IT Internship") don't survive
+    word_match's suffix group (s/es/ed/er/ers/ing only), so normalize
+    "internship(s)" -> "intern" before the allowlist pass — that's a text
+    fix, not a widening of word_match's shared suffix set."""
     low = title.lower()
+    low = re.sub(r"\binternships?\b", "intern", low)
     if not re.search(r"\bintern(?:ship)?s?\b", low):
         return False
     return any(word_match(kw, low) for kw in CAREER_ALLOWLIST)
@@ -59,6 +63,9 @@ def load_companies(path=COMPANIES_PATH):
             if entry.get("name") and entry.get("slug"):
                 boards.append({"ats": ats, "name": entry["name"],
                                "slug": entry["slug"]})
+            else:
+                logger.warning("Skipping malformed %s entry in %s: %r",
+                               ats, path, entry)
     return boards
 
 
@@ -95,12 +102,15 @@ def _posting(ats, slug, company, job_id, title, link, locations, date_posted):
 def _parse_greenhouse(name, slug, data):
     out = []
     for job in data.get("jobs", []):
+        job_id = job.get("id", "")
+        if not job_id:
+            continue
         title = strip_html(job.get("title", ""))
         if not relevant_intern_title(title):
             continue
         loc = (job.get("location") or {}).get("name", "")
         locations = [loc] if loc else []
-        out.append(_posting("greenhouse", slug, name, job.get("id", ""), title,
+        out.append(_posting("greenhouse", slug, name, job_id, title,
                             job.get("absolute_url", ""), locations,
                             _to_epoch(job.get("updated_at"))))
     return out
@@ -109,6 +119,9 @@ def _parse_greenhouse(name, slug, data):
 def _parse_lever(name, slug, data):
     out = []
     for job in data if isinstance(data, list) else []:
+        job_id = job.get("id", "")
+        if not job_id:
+            continue
         title = strip_html(job.get("text", ""))
         if not relevant_intern_title(title):
             continue
@@ -116,7 +129,7 @@ def _parse_lever(name, slug, data):
         locations = [loc] if loc else []
         created = job.get("createdAt")
         date_posted = int(created / 1000) if isinstance(created, (int, float)) else 0
-        out.append(_posting("lever", slug, name, job.get("id", ""), title,
+        out.append(_posting("lever", slug, name, job_id, title,
                             job.get("hostedUrl", ""), locations, date_posted))
     return out
 
