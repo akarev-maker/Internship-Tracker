@@ -130,12 +130,12 @@ def fetch_ats_postings(config_path=COMPANIES_PATH):
             resp = SESSION.get(url, headers={"User-Agent": USER_AGENT}, timeout=30)
             resp.raise_for_status()
             data = resp.json()
+            parse = _parse_greenhouse if board["ats"] == "greenhouse" else _parse_lever
+            found = parse(board["name"], board["slug"], data)
         except Exception as exc:  # noqa: BLE001
             logger.warning("Error fetching %s board '%s': %s",
                            board["ats"], board["name"], exc)
             continue
-        parse = _parse_greenhouse if board["ats"] == "greenhouse" else _parse_lever
-        found = parse(board["name"], board["slug"], data)
         postings.extend(found)
         logger.info("%s (%s): %d relevant intern posting(s)",
                     board["name"], board["ats"], len(found))

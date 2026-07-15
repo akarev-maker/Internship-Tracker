@@ -123,3 +123,25 @@ def test_fetch_isolates_board_failure(tmp_path, monkeypatch):
     # Bad Co failed but Good Co's two relevant postings survived
     assert len(out) == 2
     assert all(p["company"] == "Good Co" for p in out)
+
+
+class FakeSessionWithMalformed:
+    """Board 'good' returns valid GH_DATA; 'malformed' returns null."""
+
+    def get(self, url, **kwargs):
+        if "good" in url:
+            return FakeResp(GH_DATA)
+        if "malformed" in url:
+            return FakeResp(None)  # HTTP 200, but JSON is null
+        raise RuntimeError("board down")
+
+
+def test_fetch_isolates_parse_failure(tmp_path, monkeypatch):
+    p = tmp_path / "companies.toml"
+    p.write_text('[[greenhouse]]\nname = "Malformed Co"\nslug = "malformed"\n\n'
+                 '[[greenhouse]]\nname = "Good Co"\nslug = "good"\n', encoding="utf-8")
+    monkeypatch.setattr(ats_boards, "SESSION", FakeSessionWithMalformed())
+    out = ats_boards.fetch_ats_postings(str(p))
+    # Malformed Co's parse failed but Good Co's two relevant postings survived
+    assert len(out) == 2
+    assert all(p["company"] == "Good Co" for p in out)
