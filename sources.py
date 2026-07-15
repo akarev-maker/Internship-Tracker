@@ -18,7 +18,7 @@ import os
 
 from dateutil import parser as dateparser
 
-from util import SESSION, USER_AGENT, strip_html
+from util import SESSION, USER_AGENT, location_rank, strip_html
 
 logger = logging.getLogger("tracker.sources")
 
@@ -53,20 +53,6 @@ USAJOBS_INTERN_HINTS = ("intern", "student trainee", "pathways")
 
 def _is_security_role(title):
     return any(k in title.lower() for k in SECURITY_KEYWORDS)
-
-
-def location_rank(locations):
-    """0 = Massachusetts, 1 = remote, 2 = elsewhere (lower sorts first)."""
-    joined = " ".join(locations).lower()
-    if any(c in joined for c in ("massachusetts", "boston", "cambridge")):
-        return 0
-    for loc in locations:
-        tokens = [t.strip().lower() for t in loc.replace("/", ",").split(",")]
-        if "ma" in tokens:
-            return 0
-    if "remote" in joined:
-        return 1
-    return 2
 
 
 def _to_iso_date(value):

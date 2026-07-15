@@ -41,6 +41,28 @@ def _make_session():
 SESSION = _make_session()
 
 
+def word_match(keyword, text_lower):
+    """Word-boundary keyword match tolerating common suffixes, so
+    "penetration test" hits "Penetration Testing" but "api" never hits
+    "Rapid7" and "soc" never hits "Associate". Caller lowercases the text."""
+    return re.search(rf"\b{re.escape(keyword)}(?:s|es|ed|er|ers|ing)?\b",
+                     text_lower) is not None
+
+
+def location_rank(locations):
+    """0 = Massachusetts, 1 = remote, 2 = elsewhere (lower sorts first)."""
+    joined = " ".join(locations).lower()
+    if any(c in joined for c in ("massachusetts", "boston", "cambridge")):
+        return 0
+    for loc in locations:
+        tokens = [t.strip().lower() for t in loc.replace("/", ",").split(",")]
+        if "ma" in tokens:
+            return 0
+    if "remote" in joined:
+        return 1
+    return 2
+
+
 def strip_html(text, limit=None):
     """Remove HTML tags + squash whitespace from untrusted free text."""
     if not text:

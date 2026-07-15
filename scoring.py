@@ -11,11 +11,11 @@ rank_score = 0.5*fit + 0.3*urgency + 0.2*location  (all on a 0-100 scale)
 
 import hashlib
 import logging
-import re
 from datetime import date, datetime
 
 import gemini_fit as _gemini
 from store import NEEDS_ACTION_STATUSES, active_records
+from util import word_match
 
 logger = logging.getLogger("tracker.scoring")
 
@@ -41,10 +41,7 @@ def posting_text(rec):
 def keyword_fit(text, weights):
     """Deterministic 0-100 fit from weighted keyword overlap + a reason string."""
     low = text.lower()
-    # Word-boundary match, tolerating common suffixes so "penetration test"
-    # still hits "Penetration Testing" (but "api" never hits "Rapid7").
-    matched = [(kw, w) for kw, w in weights.items()
-               if re.search(rf"\b{re.escape(kw)}(?:s|es|ed|er|ers|ing)?\b", low)]
+    matched = [(kw, w) for kw, w in weights.items() if word_match(kw, low)]
     if not matched:
         return 0, "no profile keywords matched"
     total = sum(w for _, w in matched)

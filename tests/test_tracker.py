@@ -59,6 +59,19 @@ def test_location_rank():
     assert sources.location_rank(["Austin, TX"]) == 2
 
 
+def test_word_match_boundaries_and_suffixes():
+    assert util.word_match("penetration test", "penetration testing intern")
+    assert util.word_match("api", "rest apis intern")
+    assert not util.word_match("api", "security intern at rapid7")
+    assert not util.word_match("soc", "associate product manager")
+
+
+def test_location_rank_lives_in_util():
+    assert util.location_rank(["Boston, MA"]) == 0
+    assert util.location_rank(["Remote"]) == 1
+    assert util.location_rank(["Austin, TX"]) == 2
+
+
 def test_safe_url_and_md_escape():
     assert util.safe_url("javascript:alert(1)") == ""
     assert util.safe_url("https://ok.com") == "https://ok.com"
