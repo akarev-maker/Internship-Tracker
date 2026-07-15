@@ -1,0 +1,59 @@
+# Security-heavy companies whose ATS boards we poll daily.
+# Adding a company is one line-pair: name + slug (the board identifier in
+# the company's careers URL). Dead slugs are skipped with a logged warning.
+
+[[greenhouse]]
+name = "Cloudflare"
+slug = "cloudflare"
+
+[[greenhouse]]
+name = "Datadog"
+slug = "datadog"
+
+[[greenhouse]]
+name = "Elastic"
+slug = "elastic"
+
+[[greenhouse]]
+name = "Okta"
+slug = "okta"
+
+[[greenhouse]]
+name = "Abnormal Security"
+slug = "abnormalsecurity"
+
+[[greenhouse]]
+name = "Expel"
+slug = "expel"
+
+[[greenhouse]]
+name = "Praetorian"
+slug = "praetorian"
+
+[[greenhouse]]
+name = "Bishop Fox"
+slug = "bishopfox"
+
+[[greenhouse]]
+name = "Synack"
+slug = "synack"
+
+[[greenhouse]]
+name = "Huntress"
+slug = "huntress"
+
+[[greenhouse]]
+name = "GitLab"
+slug = "gitlab"
+
+[[greenhouse]]
+name = "Rubrik"
+slug = "rubrik"
+
+[[greenhouse]]
+name = "Chainguard"
+slug = "chainguard"
+
+[[greenhouse]]
+name = "Tailscale"
+slug = "tailscale"
