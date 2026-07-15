@@ -8,9 +8,9 @@ Every posting becomes:
     }
 
 `deadline` is the whole point of this project. USAJOBS exposes a real
-`ApplicationCloseDate`; the curated GitHub lists usually don't (deadline ""),
-so those are tracked by freshness until a deadline-bearing source is added
-(company ATS pages are the phase-2 target).
+`ApplicationCloseDate`; the curated GitHub lists and the ATS boards
+(Greenhouse/Lever — see `ats_boards.py` / `companies.toml`) don't publish
+deadlines, so those postings are tracked by freshness.
 """
 
 import logging

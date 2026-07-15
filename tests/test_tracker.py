@@ -109,3 +109,15 @@ def test_fetch_all_postings_survives_ats_failure(monkeypatch):
     monkeypatch.setattr(sources.ats_boards, "fetch_ats_postings", boom)
     out = sources.fetch_all_postings()
     assert [p["id"] for p in out] == ["y"]
+
+
+def test_fetch_all_postings_survives_any_source_failure(monkeypatch):
+    def boom():
+        raise RuntimeError("source exploded")
+
+    monkeypatch.setattr(sources, "fetch_usajobs", boom)
+    monkeypatch.setattr(sources, "fetch_github_lists", boom)
+    monkeypatch.setattr(sources.ats_boards, "fetch_ats_postings",
+                        lambda: [{"id": "z", "title": "C", "deadline": ""}])
+    out = sources.fetch_all_postings()
+    assert [p["id"] for p in out] == ["z"]
