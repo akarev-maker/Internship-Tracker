@@ -101,3 +101,32 @@ HIDDEN_STATUSES = TERMINAL_STATUSES - {"offer"}
 def active_records(store):
     """Records still worth showing (not rejected/skipped)."""
     return [r for r in store.values() if r.get("status") not in HIDDEN_STATUSES]
+
+
+def archived_records(store):
+    """The complement of active_records — rejected/skipped."""
+    return [r for r in store.values() if r.get("status") in HIDDEN_STATUSES]
+
+
+def rehydrate(store, records):
+    """Restore records the store is missing. Returns how many were restored.
+
+    The Actions cache is a fast path, not durable storage: it is evicted after
+    7 days without a hit and vanishes entirely if the repo is recreated. The
+    Google Sheet is what actually survives, so each run reads the Sheet back
+    into records and fills whatever the cache lost. Existing entries are never
+    touched — the cache's copy is richer (it keeps `term`, `date_posted` and
+    the cached Gemini fit, none of which are Sheet columns).
+
+    Must run *before* merge_postings, so a restored posting keeps its real
+    first_seen instead of being re-added as new with today's date.
+    """
+    restored = 0
+    for rec in records:
+        pid = rec.get("id")
+        if pid and pid not in store:
+            store[pid] = rec
+            restored += 1
+    if restored:
+        logger.info("Restored %d posting(s) from the Sheet", restored)
+    return restored

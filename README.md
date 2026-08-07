@@ -16,7 +16,11 @@ Runs daily via GitHub Actions.
 2. `store.py` folds them into a persistent store (`state/applications.json`),
    remembering your **status** and **notes** across runs. That file is your
    private pipeline, so it is gitignored — CI keeps it in the **Actions cache**
-   instead of committing it to this public repo.
+   instead of committing it to this public repo. The cache is only a fast path,
+   though: it is evicted after a quiet week and is destroyed if the repo is
+   recreated, so the **Google Sheet is the durable store**. Each run reads the
+   Sheet back and restores anything the cache lost, which is what keeps
+   `First seen` honest instead of resetting to today.
 3. `scoring.py` scores each posting against your `profile.toml`:
    - a deterministic **keyword** floor (always), and
    - a **Gemini** fit score + one-line rationale when `GEMINI_API_KEY` is set
@@ -40,12 +44,31 @@ mind publishing yours, filling in `resume` in the file works identically.
 
 ## Status
 
-Set status **in the Sheet** (the `Status` column). Each run reads your edits back
-into `state/applications.json` before rewriting. Statuses:
-`new · interested · applied · interviewing · offer · rejected · skip`
-(`rejected`/`skip` drop off the sheet). Postings you've already applied to /
-are interviewing for lose their deadline-urgency boost, so untriaged roles
-stay at the top. Don't add your own columns — the sheet is rewritten each run.
+Set status **in the Sheet** (the `Status` column), and jot anything you like in
+`Notes` — both are read back into `state/applications.json` before rewriting.
+Statuses: `new · interested · applied · interviewing · offer · rejected · skip`.
+
+`rejected`/`skip` move to the **`Archive`** tab rather than off the sheet
+entirely, so they are still remembered and won't come back as `new` after a
+cache loss. Postings you've already applied to / are interviewing for lose
+their deadline-urgency boost, so untriaged roles stay at the top. Don't add
+your own columns — both tabs are rewritten each run.
+
+## Recovering lost history
+
+If the Sheet's `First seen` column has reset to today but you still have a good
+`state/applications.json` locally, push it back up once:
+
+```bash
+export GOOGLE_SERVICE_ACCOUNT_JSON="$(cat service-account.json)"
+export GSHEET_ID=...
+python scripts/seed_sheet_from_store.py --dry-run   # report, write nothing
+python scripts/seed_sheet_from_store.py
+```
+
+It unions the local store with what's on the Sheet — your local `first_seen`,
+`status` and `notes` win, the Sheet's fresher posting fields win — and writes
+the result back. The next scheduled run reads it in.
 
 ## Setup
 

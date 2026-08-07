@@ -102,29 +102,95 @@ def test_ingested_links_are_sanitized(monkeypatch):
     assert all(p["link"] == "" for p in posts), "the javascript: URL must be dropped"
 
 
-def test_status_edits_survive_an_empty_store(monkeypatch):
-    """The store lives in the Actions cache, so a cache miss hands main() an
-    empty dict and merge_postings re-adds every posting as "new". The Sheet is
-    then the only surviving record of status, so its edits must be applied
-    *after* the merge — applying them before would silently drop them."""
+def _run_main(monkeypatch, cached_store, sheet_records, edits, postings):
+    """Drive tracker.main() with the Sheet and the cache stubbed out."""
     import tracker  # noqa: PLC0415
 
     saved = {}
     monkeypatch.setattr(tracker, "load_profile",
                         lambda: {"weights": {}, "resume": "", "version": "v"})
-    monkeypatch.setattr(tracker, "load_store", lambda: {})  # cache miss
+    monkeypatch.setattr(tracker, "load_store", lambda: cached_store)
     monkeypatch.setattr(tracker, "save_store", lambda s: saved.update(s))
-    monkeypatch.setattr(tracker.sheet, "open_worksheet", lambda: object())
-    monkeypatch.setattr(tracker.sheet, "read_status_from_sheet",
-                        lambda ws: {"a": "applied"})
-    monkeypatch.setattr(tracker.sheet, "write_sheet", lambda store, ws: None)
-    monkeypatch.setattr(tracker.sources, "fetch_all_postings",
-                        lambda: [_posting("a")])
+    monkeypatch.setattr(tracker.sheet, "open_worksheets", lambda: (object(), object()))
+    monkeypatch.setattr(tracker.sheet, "read_sheet_state",
+                        lambda ws: (sheet_records, edits))
+    monkeypatch.setattr(tracker.sheet, "write_sheet",
+                        lambda store, ws, archive=None: None)
+    monkeypatch.setattr(tracker.sources, "fetch_all_postings", lambda: postings)
     monkeypatch.setattr(tracker.scoring, "score_store", lambda store, prof: None)
 
     tracker.main()
+    return saved
 
+
+def _sheet_rec(pid, first_seen, status="new", notes=""):
+    return {"id": pid, "title": "Pentest Intern", "company": "Acme",
+            "location_str": "Remote", "locations": ["Remote"], "rank": 1,
+            "deadline": "", "status": status, "notes": notes,
+            "source": "test", "link": f"https://example.com/{pid}",
+            "first_seen": first_seen, "last_seen": first_seen}
+
+
+def test_status_edits_survive_an_empty_store(monkeypatch):
+    """A cache miss hands main() an empty dict and merge_postings re-adds every
+    posting as "new". The Sheet is then the only surviving record of status, so
+    its edits must be applied *after* the merge — applying them before would
+    silently drop them."""
+    saved = _run_main(monkeypatch, {}, [], {"a": {"status": "applied"}},
+                      [_posting("a")])
     assert saved["a"]["status"] == "applied", "the Sheet's status was lost"
+
+
+def test_empty_cache_restores_first_seen_from_the_sheet(monkeypatch):
+    """The bug this work fixes: with an empty cache every posting used to be
+    re-added with today's date, wiping the First seen column."""
+    saved = _run_main(monkeypatch, {}, [_sheet_rec("a", "2026-08-05")], {},
+                      [_posting("a")])
+    assert saved["a"]["first_seen"] == "2026-08-05"
+
+
+def test_rehydration_fills_only_the_gaps(monkeypatch):
+    """A partially-populated cache keeps its own (richer) records and gains
+    only what it was missing."""
+    cached = {}
+    store_mod.merge_postings(cached, [_posting("a")], today="2026-08-01")
+    cached["a"]["term"] = "Summer 2027"  # no Sheet column — must not be clobbered
+
+    saved = _run_main(monkeypatch, cached,
+                      [_sheet_rec("a", "2026-01-01"), _sheet_rec("b", "2026-08-05")],
+                      {}, [_posting("a")])
+
+    assert saved["a"]["first_seen"] == "2026-08-01", "cached record was overwritten"
+    assert saved["a"]["term"] == "Summer 2027"
+    assert saved["b"]["first_seen"] == "2026-08-05", "missing record was not restored"
+
+
+def test_restored_postings_are_not_flagged_new(monkeypatch):
+    """Restoring before the merge is what keeps a recovery run from reporting
+    the entire backlog as new."""
+    import tracker  # noqa: PLC0415
+
+    seen = {}
+    real_merge = store_mod.merge_postings
+    monkeypatch.setattr(tracker, "merge_postings",
+                        lambda s, p, **kw: seen.setdefault("new", real_merge(s, p, **kw)))
+    _run_main(monkeypatch, {}, [_sheet_rec("a", "2026-08-05")], {}, [_posting("a")])
+    assert seen["new"] == []
+
+
+def test_rejected_posting_does_not_resurrect(monkeypatch):
+    """Archived rows are read back too, so a re-fetched posting the user already
+    rejected stays rejected instead of returning as "new"."""
+    saved = _run_main(monkeypatch, {},
+                      [_sheet_rec("a", "2026-08-05", status="rejected")],
+                      {"a": {"status": "rejected"}}, [_posting("a")])
+    assert saved["a"]["status"] == "rejected"
+
+
+def test_rehydrate_ignores_records_without_an_id():
+    store = {}
+    assert store_mod.rehydrate(store, [{"title": "no id"}, {"id": "", "title": "x"}]) == 0
+    assert store == {}
 
 
 def test_usajobs_queries_tuned():
