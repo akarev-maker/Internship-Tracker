@@ -73,15 +73,18 @@ def _parse_batch(text, expected_ids):
     return out
 
 
-_last_call = 0.0
+_last_call = None
 
 
 def _throttle():
-    # Free-tier RPM limit — space real API calls out; the first call never waits.
+    # Free-tier RPM limit — space real API calls out. None (not 0.0) means
+    # "no call yet": time.monotonic()'s zero point is arbitrary per platform,
+    # so comparing against 0.0 could make the very first call sleep.
     global _last_call
-    wait = MIN_SECONDS_BETWEEN_CALLS - (time.monotonic() - _last_call)
-    if wait > 0:
-        time.sleep(wait)
+    if _last_call is not None:
+        wait = MIN_SECONDS_BETWEEN_CALLS - (time.monotonic() - _last_call)
+        if wait > 0:
+            time.sleep(wait)
     _last_call = time.monotonic()
 
 

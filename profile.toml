@@ -1,9 +1,20 @@
 # Your skillset. Edit freely — higher weight = matters more to you.
 # Changing this file re-scores every posting once (the cache keys on its hash).
 
-resume = """
-[resume redacted - supplied via the PROFILE_RESUME secret]
-"""
+# Your résumé is personal, so this public file leaves it blank: set the real
+# text in the PROFILE_RESUME environment variable (a GitHub Actions secret),
+# which overrides whatever is here. Filling this in works too — it just
+# commits your résumé to the repo. Only Gemini scoring reads it; the
+# [weights] below drive the deterministic score either way.
+#
+# Example of the shape it expects (one prose paragraph):
+#   resume = """
+#   Early-undergrad CS student. Strongest in web-application exploitation
+#   (XSS, SQL injection, file upload, API attacks). Pentest fundamentals
+#   (Nmap, Metasploit, enumeration). Blue-team basics (SIEM, incident
+#   handling, log analysis). Python/FastAPI engineering. Based in Boston.
+#   """
+resume = ""
 
 [weights]                 # deterministic keyword floor
 "web application" = 5

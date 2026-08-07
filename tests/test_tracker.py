@@ -72,11 +72,34 @@ def test_location_rank_lives_in_util():
     assert util.location_rank(["Austin, TX"]) == 2
 
 
-def test_safe_url_and_md_escape():
+def test_sanitizers():
     assert util.safe_url("javascript:alert(1)") == ""
-    assert util.safe_url("https://ok.com") == "https://ok.com"
-    assert "\\[" in util.md_escape("a [b](c)")
+    assert util.safe_url("data:text/html,<script>") == ""
+    assert util.safe_url("  https://ok.com  ") == "https://ok.com"
+    assert util.safe_url(None) == ""
     assert "<img" not in util.strip_html("x <img onerror=1> y")
+
+
+def test_ingested_links_are_sanitized(monkeypatch):
+    """A feed can put anything in `url`; only http(s) reaches the Sheet."""
+
+    class FakeResp:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return [{"active": True, "title": "Security Intern",
+                     "company_name": "Evil", "url": "javascript:alert(1)",
+                     "id": "evil-1", "locations": []}]
+
+    class FakeSession:
+        def get(self, *a, **kw):
+            return FakeResp()
+
+    monkeypatch.setattr(sources, "SESSION", FakeSession())
+    posts = sources.fetch_github_lists()
+    assert posts, "the posting should still be tracked"
+    assert all(p["link"] == "" for p in posts), "the javascript: URL must be dropped"
 
 
 def test_usajobs_queries_tuned():

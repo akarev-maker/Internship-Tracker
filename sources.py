@@ -20,7 +20,7 @@ from dateutil import parser as dateparser
 
 import ats_boards
 
-from util import SESSION, USER_AGENT, location_rank, strip_html
+from util import SESSION, USER_AGENT, location_rank, safe_url, strip_html
 
 logger = logging.getLogger("tracker.sources")
 
@@ -91,7 +91,7 @@ def fetch_github_lists():
                     "id": key,
                     "title": strip_html(item.get("title", "")),
                     "company": strip_html(item.get("company_name") or ""),
-                    "link": item.get("url", ""),
+                    "link": safe_url(item.get("url", "")),
                     "locations": locations,
                     "location_str": ", ".join(locations) if locations else "Unspecified",
                     "source": "Simplify/GitHub",
@@ -107,12 +107,14 @@ def fetch_github_lists():
 
 
 def fetch_usajobs():
-    key = os.environ.get("USAJOBS_API_KEY")
+    api_key = os.environ.get("USAJOBS_API_KEY")
     email = os.environ.get("USAJOBS_EMAIL")
-    if not key or not email:
+    if not api_key or not email:
         logger.info("USAJOBS_API_KEY/USAJOBS_EMAIL not set — skipping USAJOBS.")
         return []
-    headers = {"Host": "data.usajobs.gov", "User-Agent": email, "Authorization-Key": key}
+    # Named api_key, not key: the per-posting loop below binds its own `key`.
+    headers = {"Host": "data.usajobs.gov", "User-Agent": email,
+               "Authorization-Key": api_key}
     postings, seen = [], set()
     for keyword, location in USAJOBS_QUERIES:
         params = {"Keyword": keyword, "ResultsPerPage": 25}
@@ -149,7 +151,7 @@ def fetch_usajobs():
                     "id": key,
                     "title": strip_html(title),
                     "company": strip_html(d.get("OrganizationName") or ""),
-                    "link": d.get("PositionURI", ""),
+                    "link": safe_url(d.get("PositionURI", "")),
                     "locations": locations,
                     "location_str": ", ".join(locations) if locations else "Unspecified",
                     "source": "USAJOBS",
@@ -186,3 +188,15 @@ def fetch_all_postings():
     with_deadline = sum(1 for p in postings if p["deadline"])
     logger.info("Total %d posting(s), %d with a deadline", len(postings), with_deadline)
     return postings
+
+
+if __name__ == "__main__":
+    # `python sources.py` — inspect what the sources return, without touching
+    # the store, the Sheet, or Gemini. Needs no secrets (USAJOBS is skipped
+    # unless its key is set).
+    logging.basicConfig(level=logging.INFO,
+                        format="%(levelname)s %(name)s: %(message)s")
+    for _p in fetch_all_postings():
+        print(f"[{_p['source']}] {_p['title']} — {_p['company']} "
+              f"({_p['location_str']}) {_p['deadline'] or 'no deadline'}\n"
+              f"    {_p['link']}")

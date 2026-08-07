@@ -14,7 +14,9 @@ Runs daily via GitHub Actions.
    and **security-company ATS boards** (Greenhouse/Lever) — edit
    `companies.toml` to add or remove companies.
 2. `store.py` folds them into a persistent store (`state/applications.json`),
-   remembering your **status** and **notes** across runs.
+   remembering your **status** and **notes** across runs. That file is your
+   private pipeline, so it is gitignored — CI keeps it in the **Actions cache**
+   instead of committing it to this public repo.
 3. `scoring.py` scores each posting against your `profile.toml`:
    - a deterministic **keyword** floor (always), and
    - a **Gemini** fit score + one-line rationale when `GEMINI_API_KEY` is set
@@ -28,8 +30,13 @@ Runs daily via GitHub Actions.
 ## Your profile
 
 Edit **`profile.toml`** — weighted keywords (`[weights]`) drive the deterministic
-score; the `resume` blob is what Gemini matches against. Higher weight = matters
-more. Editing the file re-scores every posting once.
+score. Higher weight = matters more. Editing the file re-scores every posting once.
+
+The **résumé** is what Gemini matches against, and it's personal, so it is *not*
+in this repo: `resume` is left blank and the real text comes from the
+`PROFILE_RESUME` secret, which overrides the file when set. Rotating the secret
+also re-scores everything once (it's part of the fit-cache key). If you don't
+mind publishing yours, filling in `resume` in the file works identically.
 
 ## Status
 
@@ -48,9 +55,14 @@ In a GitHub repo, add these **Secrets** (Settings → Secrets and variables → 
 |--------|-------|
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | full JSON key for a Google service account |
 | `GSHEET_ID` | the target spreadsheet's ID (from its URL) |
+| `PROFILE_RESUME` *(optional)* | your résumé as one prose paragraph — see [Your profile](#your-profile) |
 | `GEMINI_API_KEY` *(optional)* | enables Gemini fit scoring + rationale |
 | `USAJOBS_API_KEY` *(optional)* | free key from developer.usajobs.gov — deadline-bearing federal postings |
 | `USAJOBS_EMAIL` *(optional)* | the email you registered with USAJOBS |
+
+Nothing is read from a config file — every credential comes from the
+environment, so a fork of this repo carries none of your access. See
+[SECURITY.md](SECURITY.md).
 
 **Google Sheet setup:** create a Google Cloud service account, enable the Google
 Sheets API, download its JSON key (→ `GOOGLE_SERVICE_ACCOUNT_JSON`), create a
@@ -62,7 +74,7 @@ spreadsheet's ID in `GSHEET_ID`.
 ```bash
 pip install -r requirements.txt pytest
 pytest                 # network-free; needs no secrets
-python sources.py      # inspect fetched postings
+python sources.py      # inspect fetched postings (no store, Sheet, or Gemini)
 ```
 
 ## Roadmap

@@ -5,9 +5,12 @@ This is what makes the tracker a *tracker* rather than a feed: it remembers ever
 posting it has seen and the status you assign it. New postings enter as "new";
 your status/notes on existing ones are preserved across runs.
 
-Set status by editing state/applications.json (a future phase adds a
-GitHub-Issues board UI). Valid statuses:
+Set status in the Google Sheet's Status column; sheet.py reads your edits back
+into this store at the start of each run. Valid statuses:
     new · interested · applied · interviewing · offer · rejected · skip
+
+The store holds your real pipeline, so it is gitignored and CI keeps it in the
+Actions cache rather than committing it to this public repo.
 """
 
 import json
@@ -91,6 +94,10 @@ def merge_postings(store, postings, today=None):
     return new_ids
 
 
+# Terminal, but still worth showing: an offer belongs on the sheet.
+HIDDEN_STATUSES = TERMINAL_STATUSES - {"offer"}
+
+
 def active_records(store):
     """Records still worth showing (not rejected/skipped)."""
-    return [r for r in store.values() if r.get("status") not in {"rejected", "skip"}]
+    return [r for r in store.values() if r.get("status") not in HIDDEN_STATUSES]

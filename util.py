@@ -1,9 +1,12 @@
 """
-util.py — shared helpers (HTTP session with retries, text sanitization).
+util.py — shared helpers (HTTP session with retries, matching, sanitization).
 
-Carried over from the Morning-Briefing project's hardening: a retry session so a
-flaky moment doesn't drop a source, and sanitizers so untrusted posting text
-can't inject markup or forge links into the digest email.
+Everything here treats posting data as untrusted: it arrives from third-party
+job feeds and ATS boards that anyone can publish to. `strip_html` and
+`safe_url` are applied at ingestion so no posting can smuggle markup into the
+Sheet or a `javascript:`/`data:` URL into the Link column.
+
+A retry session keeps a flaky moment from silently dropping a whole source.
 """
 
 import re
@@ -72,16 +75,6 @@ def strip_html(text, limit=None):
     if limit and len(text) > limit:
         text = text[:limit].rsplit(" ", 1)[0] + "…"
     return text
-
-
-def md_escape(text):
-    """Escape Markdown-control chars so untrusted text can't forge links/markup."""
-    if not text:
-        return ""
-    out = str(text)
-    for ch in ("\\", "`", "*", "_", "[", "]", "<", ">"):
-        out = out.replace(ch, "\\" + ch)
-    return out
 
 
 def safe_url(url):

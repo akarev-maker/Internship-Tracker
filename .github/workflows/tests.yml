@@ -6,6 +6,11 @@ on:
   pull_request:
   workflow_dispatch:
 
+# Fork pull requests run this workflow. Pin the token to read-only rather than
+# inheriting whatever the repo default is.
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest

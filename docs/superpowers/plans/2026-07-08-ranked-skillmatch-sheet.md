@@ -82,8 +82,14 @@ siem = 2
 [boosts]
 massachusetts = true
 
+# The real résumé is supplied via the PROFILE_RESUME secret, not committed.
 resume = """
-[resume redacted - supplied via the PROFILE_RESUME secret]
+Early-undergrad Computer Engineering student. Strongest in web-application
+exploitation (web proxies, XSS, SQL injection, file upload, API attacks,
+command injection; CTF web challenges). Pentest fundamentals (Nmap,
+Metasploit, enumeration, methodology). Blue-team basics (SIEM fundamentals,
+incident handling, network traffic and log analysis, Windows event logs).
+Strong Python/FastAPI engineering. Also Java and Bash.
 """
 ```
 

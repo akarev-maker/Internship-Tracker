@@ -3,3 +3,12 @@ __pycache__/
 venv/
 .venv/
 .env
+
+# Your applications pipeline (statuses, notes). Kept out of this public repo —
+# CI persists it in the Actions cache instead. See .github/workflows/track.yml.
+state/
+
+# Local tooling / OS noise — keeps `git add -A` from committing junk.
+.pytest_cache/
+.superpowers/
+.DS_Store

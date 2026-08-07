@@ -16,7 +16,8 @@ import tomllib
 
 from dateutil import parser as dateparser
 
-from util import SESSION, USER_AGENT, location_rank, strip_html, word_match
+from util import (SESSION, USER_AGENT, location_rank, safe_url, strip_html,
+                  word_match)
 
 logger = logging.getLogger("tracker.ats")
 
@@ -88,7 +89,7 @@ def _posting(ats, slug, company, job_id, title, link, locations, date_posted):
         "id": _pid(ats, slug, job_id),
         "title": title,
         "company": company,
-        "link": link,
+        "link": safe_url(link),
         "locations": locations,
         "location_str": ", ".join(locations) if locations else "Unspecified",
         "source": "Greenhouse" if ats == "greenhouse" else "Lever",

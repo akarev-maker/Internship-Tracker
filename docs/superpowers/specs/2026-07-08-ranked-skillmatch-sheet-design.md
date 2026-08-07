@@ -21,14 +21,17 @@ where to apply first, weighted toward how well each role matches their skillset.
 
 ## User skill profile (source material for matching)
 
-- Early undergrad, [school] B.S. Computer Engineering, grad **[year]**.
-- **Strongest lane: web-application exploitation** — a web-security learning path (web proxies,
-  XSS, SQLi, file upload, API attacks, command injection); CTF web challenges.
+The real profile is personal and lives outside this repo — the `[weights]` in
+`profile.toml` plus the `PROFILE_RESUME` secret. The shape it takes:
+
+- Early undergrad, B.S. Computer Engineering, with a known graduation year.
+- **Strongest lane: web-application exploitation** — web proxies, XSS, SQLi,
+  file upload, API attacks, command injection; CTF web challenges.
 - **Pentest fundamentals:** Nmap, Metasploit, footprinting, methodology.
 - **Blue-team basics:** SIEM fundamentals, incident handling, traffic/log
   analysis, Windows event logs.
-- **Engineering:** strong Python (FastAPI project [personal project]), Java, Bash.
-- **Location signal:** Massachusetts ([school]) is doubly relevant.
+- **Engineering:** strong Python/FastAPI, Java, Bash.
+- **Location signal:** a home state that is doubly relevant (school + jobs).
 
 ## Decisions (from brainstorming)
 
@@ -91,8 +94,12 @@ siem = 2
 [boosts]
 massachusetts = true
 
+# Illustrative only — the real text comes from the PROFILE_RESUME secret.
 resume = """
-[resume redacted - supplied via the PROFILE_RESUME secret]
+Early-undergrad CE student. Strongest in web-application exploitation
+(proxies, XSS, SQLi, file upload, API attacks; CTF web challenges). Pentest
+fundamentals (Nmap, Metasploit). Blue-team basics (SIEM, incident handling,
+traffic/log analysis). Strong Python/FastAPI.
 """
 ```
 

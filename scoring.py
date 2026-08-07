@@ -1,8 +1,8 @@
 """
 scoring.py — score each posting against the user's profile and blend into a rank.
 
-fit    : how well the role matches your skillset (keyword floor; Gemini overrides
-         it when a key is present — see score_store in this module, Task 4).
+fit    : how well the role matches your skillset (keyword floor; Gemini
+         overrides it when a key is present — see score_store below).
 urgency: decays from the application deadline.
 location: MA/remote/elsewhere boost.
 
@@ -28,14 +28,28 @@ DEADLINE_WINDOW_DAYS = 21
 KEYWORD_FIT_TARGET = 15.0
 BATCH_SIZE = 10                   # postings per Gemini request
 MAX_GEMINI_REQUESTS_PER_RUN = 30  # request budget per run (free-tier friendly)
+# Hard cap on one posting's text. Titles are normally well under 150 chars;
+# anything longer is a broken or hostile feed, and this text is pasted into
+# the Gemini prompt, so an unbounded field is both a cost and an injection
+# surface. Truncating costs nothing real and bounds both.
+MAX_POSTING_TEXT = 300
 
 
 def posting_text(rec):
     """The text we have to match against (the fields the record actually
-    carries: title, company, term, location)."""
+    carries: title, company, term, location).
+
+    Posting fields are attacker-controllable — anyone can publish to the
+    feeds we read — and this string is interpolated into the Gemini prompt.
+    Newlines are collapsed so a posting cannot forge the `POSTING <id>:`
+    delimiters that separate one posting from the next, and the whole thing
+    is length-capped. `_parse_batch` independently ignores any id it did not
+    ask about, so the blast radius of a crafted posting stays inside its own
+    batch."""
     parts = [rec.get("title", ""), rec.get("company", ""),
              str(rec.get("term", "")), rec.get("location_str", "")]
-    return " ".join(p for p in parts if p)
+    text = " ".join(p for p in parts if p)
+    return " ".join(text.split())[:MAX_POSTING_TEXT]
 
 
 def keyword_fit(text, weights):
