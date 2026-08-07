@@ -36,11 +36,10 @@ GITHUB_SOURCES = [
     ),
 ]
 
-SECURITY_KEYWORDS = (
-    "security", "cyber", "penetration", "pentest", "pen test", "red team",
-    "appsec", "infosec", "soc analyst", "malware", "vulnerability",
-    "incident response", "threat",
-)
+# The GitHub lists are all-tech by construction (they are CS-internship
+# lists), so every active listing is ingested. No title filter here: the
+# profile weights + Gemini rank security roles to the top, and the general
+# SWE/IT tail stays on the sheet as the long list to work through.
 
 # --- USAJOBS (federal; real deadlines) --------------------------------------
 USAJOBS_URL = "https://data.usajobs.gov/api/search"
@@ -52,10 +51,6 @@ USAJOBS_QUERIES = [
     ("information technology student trainee", "Massachusetts"),
 ]
 USAJOBS_INTERN_HINTS = ("intern", "student trainee", "pathways")
-
-
-def _is_security_role(title):
-    return any(k in title.lower() for k in SECURITY_KEYWORDS)
 
 
 def _to_iso_date(value):
@@ -79,7 +74,7 @@ def fetch_github_lists():
             continue
         added = 0
         for item in listings:
-            if not item.get("active") or not _is_security_role(item.get("title", "")):
+            if not item.get("active"):
                 continue
             key = item.get("url") or item.get("id")
             if not key or key in seen:
@@ -102,7 +97,7 @@ def fetch_github_lists():
                 }
             )
             added += 1
-        logger.info("Fetched %d security internship(s) from %s", added, label)
+        logger.info("Fetched %d active internship(s) from %s", added, label)
     return postings
 
 

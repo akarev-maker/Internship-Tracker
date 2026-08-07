@@ -3,10 +3,11 @@ ats_boards.py — postings from curated company ATS boards (Greenhouse/Lever).
 
 Public, keyless JSON APIs; one request per company per day via the shared
 retry session. companies.toml lists the boards. Only internship titles that
-match the security-career allowlist are kept (the company being on the
-curated list is the security signal; the allowlist keeps out non-career
-roles), normalized to the standard posting shape documented in sources.py.
-These APIs do not publish application close dates, so deadline is always "".
+match the tech-career allowlist are kept (the allowlist keeps out
+non-technical intern roles — marketing, HR, legal; ranking, not filtering,
+is what sorts security roles to the top), normalized to the standard posting
+shape documented in sources.py. These APIs do not publish application close
+dates, so deadline is always "".
 """
 
 import hashlib
@@ -25,8 +26,12 @@ COMPANIES_PATH = "companies.toml"
 GREENHOUSE_URL = "https://boards-api.greenhouse.io/v1/boards/{slug}/jobs"
 LEVER_URL = "https://api.lever.co/v0/postings/{slug}?mode=json"
 
-# Security roles plus the classic entry-path roles into the field
-# (the user's target: pen testing). Word-boundary matched — never substring.
+# Security roles, the classic entry-path roles into the field (the user's
+# target: pen testing), and general tech roles — the boards are all tech
+# companies, so any technical internship there is worth listing; ranking
+# sorts security to the top. The allowlist still exists to keep out
+# non-technical intern roles (marketing, HR, legal, sales, finance).
+# Word-boundary matched — never substring.
 CAREER_ALLOWLIST = (
     "security", "cyber", "cybersecurity", "pentest", "pen test", "penetration",
     "red team", "blue team", "appsec", "infosec", "soc analyst", "soc intern",
@@ -34,6 +39,11 @@ CAREER_ALLOWLIST = (
     "exploit", "identity", "iam", "grc", "network", "it intern",
     "information technology", "helpdesk", "help desk",
     "system administrator", "sysadmin", "technical support",
+    # general tech
+    "software", "swe", "engineer", "developer", "devops", "cloud",
+    "infrastructure", "site reliability", "sre", "platform", "backend",
+    "frontend", "full stack", "fullstack", "data", "machine learning", "ml",
+    "qa", "quality assurance",
 )
 
 
