@@ -52,6 +52,74 @@ def test_volatile_fields_refresh():
     assert store["a"]["deadline"] == "2026-08-01"
 
 
+# --- term filter + purge ------------------------------------------------------
+def test_term_is_wanted():
+    assert sources.term_is_wanted(["Summer 2027"])
+    assert sources.term_is_wanted(["Summer 2026", "Summer 2027"])  # any match
+    assert sources.term_is_wanted([])            # unlabeled passes
+    assert sources.term_is_wanted(["N/A"])       # so does N/A
+    assert sources.term_is_wanted("")            # string form, unlabeled
+    assert sources.term_is_wanted("Summer 2026, Summer 2027")  # joined form
+    assert not sources.term_is_wanted(["Summer 2026"])
+    assert not sources.term_is_wanted(["Fall 2026"])
+    assert not sources.term_is_wanted("Spring 2026")
+
+
+def test_stale_listing_only_fires_on_github_lists():
+    stale = {"source": "Simplify/GitHub", "term": "Summer 2026"}
+    wanted = {"source": "Simplify/GitHub", "term": "Summer 2027"}
+    ats = {"source": "Greenhouse", "term": ""}
+    fed = {"source": "USAJOBS", "term": "Federal"}
+    assert sources.stale_listing(stale)
+    assert not sources.stale_listing(wanted)
+    assert not sources.stale_listing(ats), "ATS records are never stale by term"
+    assert not sources.stale_listing(fed)
+
+
+def test_purge_drops_stale_new_but_never_touched_records():
+    store = {
+        "gone": {"status": "new", "source": "Simplify/GitHub", "term": "Summer 2026"},
+        "kept": {"status": "new", "source": "Simplify/GitHub", "term": "Summer 2027"},
+        "mine": {"status": "interested", "source": "Simplify/GitHub",
+                 "term": "Summer 2026"},  # user-touched — off limits
+        "ats":  {"status": "new", "source": "Greenhouse", "term": ""},
+    }
+    n = store_mod.purge_records(store, sources.stale_listing)
+    assert n == 1
+    assert set(store) == {"kept", "mine", "ats"}
+
+
+def test_fetch_github_lists_filters_by_term(monkeypatch):
+    listings = [
+        {"active": True, "title": "SWE Intern 2027", "company_name": "A",
+         "url": "https://x/1", "id": "1", "locations": [], "terms": ["Summer 2027"]},
+        {"active": True, "title": "SWE Intern 2026", "company_name": "B",
+         "url": "https://x/2", "id": "2", "locations": [], "terms": ["Summer 2026"]},
+        {"active": True, "title": "SWE Intern unlabeled", "company_name": "C",
+         "url": "https://x/3", "id": "3", "locations": []},
+        {"active": False, "title": "Inactive 2027", "company_name": "D",
+         "url": "https://x/4", "id": "4", "locations": [], "terms": ["Summer 2027"]},
+    ]
+
+    class FakeResp:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return listings
+
+    class FakeSession:
+        def get(self, *a, **kw):
+            return FakeResp()
+
+    monkeypatch.setattr(sources, "SESSION", FakeSession())
+    posts = sources.fetch_github_lists()
+    # both sources serve the same fake file; dedupe leaves one of each
+    assert sorted(p["title"] for p in posts) == ["SWE Intern 2027",
+                                                 "SWE Intern unlabeled"]
+    assert {p["term"] for p in posts} == {"Summer 2027", ""}
+
+
 # --- ranking inputs + sanitization -----------------------------------------
 def test_location_rank():
     assert sources.location_rank(["Boston, MA"]) == 0
@@ -154,7 +222,7 @@ def test_rehydration_fills_only_the_gaps(monkeypatch):
     only what it was missing."""
     cached = {}
     store_mod.merge_postings(cached, [_posting("a")], today="2026-08-01")
-    cached["a"]["term"] = "Summer 2027"  # no Sheet column — must not be clobbered
+    cached["a"]["term"] = "Summer 2027"  # rehydrate must not clobber cached records
 
     saved = _run_main(monkeypatch, cached,
                       [_sheet_rec("a", "2026-01-01"), _sheet_rec("b", "2026-08-05")],

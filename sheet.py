@@ -23,7 +23,7 @@ from util import location_rank
 
 logger = logging.getLogger("tracker.sheet")
 
-COLUMNS = ["#", "Score", "Fit", "Why", "Role", "Company", "Location",
+COLUMNS = ["#", "Score", "Fit", "Why", "Role", "Company", "Location", "Term",
            "Deadline", "Days left", "Status", "Notes", "Source", "Link",
            "First seen", "ID"]
 
@@ -31,12 +31,14 @@ ARCHIVE_TITLE = "Archive"
 
 # Sheet column -> record field, for the read-back. Only durable fields appear:
 # fit_score/fit_hash/fit_source are deliberately omitted so score_store
-# re-derives them (it already retries any non-Gemini fit), and term/date_posted
-# have no column and refill the next time the posting shows up in a feed.
+# re-derives them (it already retries any non-Gemini fit), and date_posted
+# has no column and refills the next time the posting shows up in a feed.
+# Term must round-trip: the stale-season purge keys on it.
 _COLUMN_FIELDS = {
     "Role": "title",
     "Company": "company",
     "Location": "location_str",
+    "Term": "term",
     "Deadline": "deadline",
     "Status": "status",
     "Notes": "notes",
@@ -59,6 +61,7 @@ def _rows_for(recs):
             r.get("title", ""),
             r.get("company", ""),
             r.get("location_str", ""),
+            r.get("term", ""),
             r.get("deadline", ""),
             "" if days is None else days,
             r.get("status", "new"),

@@ -25,21 +25,51 @@ from util import SESSION, USER_AGENT, location_rank, safe_url, strip_html
 logger = logging.getLogger("tracker.sources")
 
 # --- Curated GitHub internship lists (high volume, usually no deadline) -----
+# Note: Simplify serves one rolling listings.json across its season repos
+# (the Summer2026 and Summer2027 URLs return the identical file), so pointing
+# at one Simplify repo is enough; each listing carries its own `terms`.
 GITHUB_SOURCES = [
     (
-        "Summer 2026",
-        "https://raw.githubusercontent.com/SimplifyJobs/Summer2026-Internships/dev/.github/scripts/listings.json",
+        "Simplify",
+        "https://raw.githubusercontent.com/SimplifyJobs/Summer2027-Internships/dev/.github/scripts/listings.json",
     ),
     (
-        "Summer 2027",
+        "vanshb03",
         "https://raw.githubusercontent.com/vanshb03/Summer2027-Internships/dev/.github/scripts/listings.json",
     ),
 ]
 
 # The GitHub lists are all-tech by construction (they are CS-internship
-# lists), so every active listing is ingested. No title filter here: the
-# profile weights + Gemini rank security roles to the top, and the general
-# SWE/IT tail stays on the sheet as the long list to work through.
+# lists), so no title filter: the profile weights + Gemini rank security
+# roles to the top, and the general SWE/IT tail stays on the sheet as the
+# long list to work through. Terms ARE filtered — the rolling file still
+# carries seasons that have passed.
+#
+# A listing is kept if a term matches WANTED_TERMS, or if it names no dated
+# term at all (many current postings just don't fill one in). When a new
+# recruiting season starts, update this tuple.
+WANTED_TERMS = ("Summer 2027",)
+_UNLABELED = ("", "n/a", "none")
+
+
+def term_is_wanted(terms):
+    """terms: an iterable of term strings, or the joined string a record
+    stores. Unlabeled postings pass; dated ones must name a wanted term."""
+    if isinstance(terms, str):
+        terms = terms.split(",")
+    labeled = [t.strip() for t in terms
+               if t and t.strip().lower() not in _UNLABELED]
+    if not labeled:
+        return True
+    return any(t in WANTED_TERMS for t in labeled)
+
+
+def stale_listing(rec):
+    """True for a GitHub-list record whose season has passed — the purge
+    predicate wired into tracker.py. ATS/USAJOBS records carry no term data
+    and are never stale by term."""
+    return rec.get("source") == "Simplify/GitHub" and not term_is_wanted(
+        rec.get("term") or "")
 
 # --- USAJOBS (federal; real deadlines) --------------------------------------
 USAJOBS_URL = "https://data.usajobs.gov/api/search"
@@ -76,6 +106,9 @@ def fetch_github_lists():
         for item in listings:
             if not item.get("active"):
                 continue
+            terms = item.get("terms") or []
+            if not term_is_wanted(terms):
+                continue
             key = item.get("url") or item.get("id")
             if not key or key in seen:
                 continue
@@ -90,7 +123,7 @@ def fetch_github_lists():
                     "locations": locations,
                     "location_str": ", ".join(locations) if locations else "Unspecified",
                     "source": "Simplify/GitHub",
-                    "term": (item.get("terms") or [label])[0],
+                    "term": ", ".join(strip_html(t) for t in terms),
                     "date_posted": item.get("date_posted") or 0,
                     "deadline": "",  # not exposed by these lists
                     "rank": location_rank(locations),
