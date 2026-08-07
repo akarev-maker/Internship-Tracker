@@ -19,11 +19,16 @@ class FakeWS:
         return self._values
 
     def update(self, range_name=None, values=None, **kwargs):
+        if len(values) > self.row_count:
+            raise RuntimeError("exceeds grid limits")  # what the real API does
         self.updated = (range_name, values)
         self.update_kwargs = kwargs
 
     def batch_clear(self, ranges):
         self.batch_cleared.extend(ranges)
+
+    def add_rows(self, n):
+        self.row_count += n
 
 
 def _rec(pid, rank_score, status="new", title="Intern"):
@@ -210,6 +215,16 @@ def test_archive_read_back_keeps_rejected_status():
 
     back = sheet.read_store_from_sheet([FakeWS(_written(main)), FakeWS(_written(arch))])
     assert [r["status"] for r in back] == ["rejected"]
+
+
+def test_write_sheet_grows_the_grid_for_long_lists():
+    """With the security filter gone the list is ~1800 rows, and the API
+    rejects writes past the grid — the sheet must be grown first."""
+    store = {f"p{i}": _rec(f"p{i}", i) for i in range(1500)}
+    ws = FakeWS(row_count=1000)
+    sheet.write_sheet(store, worksheet=ws)  # must not raise "exceeds grid limits"
+    assert len(_written(ws)) == 1501
+    assert ws.row_count >= 1501
 
 
 def test_write_sheet_survives_a_failing_archive_tab():

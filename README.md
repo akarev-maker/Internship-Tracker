@@ -9,10 +9,12 @@ Runs daily via GitHub Actions.
 
 ## How it works
 
-1. `sources.py` fetches postings from curated GitHub internship lists,
-   **USAJOBS** (federal roles, which expose a real `ApplicationCloseDate`),
-   and **security-company ATS boards** (Greenhouse/Lever) — edit
-   `companies.toml` to add or remove companies.
+1. `sources.py` fetches postings from curated GitHub internship lists (every
+   active tech internship — ~1,800 as of Aug 2026 — no title filter; ranking,
+   not filtering, is what puts security roles on top), **USAJOBS** (federal
+   roles, which expose a real `ApplicationCloseDate`), and **security-company
+   ATS boards** (Greenhouse/Lever) — edit `companies.toml` to add or remove
+   companies.
 2. `store.py` folds them into a persistent store (`state/applications.json`),
    remembering your **status** and **notes** across runs. That file is your
    private pipeline, so it is gitignored — CI keeps it in the **Actions cache**

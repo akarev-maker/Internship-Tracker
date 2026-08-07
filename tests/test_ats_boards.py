@@ -35,8 +35,14 @@ def test_relevant_intern_title_allowlist():
     assert ats_boards.relevant_intern_title("Penetration Testing Internship")
     assert ats_boards.relevant_intern_title("IT Intern")
     assert ats_boards.relevant_intern_title("SOC Analyst Intern")
+    # general tech roles are kept now — ranking, not filtering, sorts security up
+    assert ats_boards.relevant_intern_title("Software Engineer Intern")
+    assert ats_boards.relevant_intern_title("Data Engineering Intern")
+    assert ats_boards.relevant_intern_title("DevOps Internship")
+    # non-technical intern roles still don't match
     assert not ats_boards.relevant_intern_title("Marketing Intern")
-    assert not ats_boards.relevant_intern_title("Data Engineering Intern")
+    assert not ats_boards.relevant_intern_title("Legal Intern")
+    assert not ats_boards.relevant_intern_title("People Operations Intern")
     # "soc" must not fire inside "Associate"
     assert not ats_boards.relevant_intern_title("Associate Product Manager Intern")
 
@@ -76,12 +82,14 @@ def test_parse_greenhouse_fixture():
 
 def test_parse_lever_fixture():
     out = ats_boards._parse_lever("Acme Sec", "acmesec", LV_DATA)
-    assert [p["title"] for p in out] == ["IT Intern", "SOC Analyst Intern"]
+    # "Data Engineering Intern" survives too now that general tech is kept
+    assert [p["title"] for p in out] == ["IT Intern", "Data Engineering Intern",
+                                         "SOC Analyst Intern"]
     assert out[0]["source"] == "Lever"
     assert out[0]["rank"] == 1  # Fully Remote
     assert out[0]["date_posted"] == 1780000000
-    assert out[1]["location_str"] == "Unspecified" and out[1]["rank"] == 2
-    assert out[1]["date_posted"] == 0
+    assert out[2]["location_str"] == "Unspecified" and out[2]["rank"] == 2
+    assert out[2]["date_posted"] == 0
 
 
 def test_ids_stable_across_parses():

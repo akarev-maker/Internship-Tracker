@@ -192,6 +192,10 @@ def read_status_from_sheet(worksheets=None):
 
 
 def _write_rows(ws, rows):
+    # The API rejects writes past the grid, and a default sheet is 1000 rows —
+    # smaller than the full postings list — so grow the grid first.
+    if ws.row_count < len(rows):
+        ws.add_rows(len(rows) - ws.row_count)
     # Overwrite in place, then trim leftover rows from a previously longer
     # sheet — never blank the sheet before the new data is confirmed written.
     # raw=True keeps untrusted posting/LLM text from being parsed as formulas.
