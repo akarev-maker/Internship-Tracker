@@ -37,6 +37,14 @@ logger = logging.getLogger("tracker.seed")
 # first-seen date. Everything else on the Sheet is a fresher fetch, so it wins.
 _LOCAL_WINS = ("first_seen", "status", "notes")
 
+# Fields with no Sheet column, so there is nothing on the Sheet to lose a
+# contest with — carry them over rather than discarding them. The cached Gemini
+# fit matters most: score_store re-validates it against fit_hash and re-scores
+# on any mismatch, so a stale one costs nothing, while dropping a good one
+# spends Gemini budget re-earning a score we already had.
+_LOCAL_FILLS = ("fit_score", "fit_reason", "fit_hash", "fit_source",
+                "term", "date_posted")
+
 
 def merge_local_into_sheet(sheet_records, local_store):
     """Union of both, as a store dict. Local wins for _LOCAL_WINS; the Sheet
@@ -59,6 +67,9 @@ def merge_local_into_sheet(sheet_records, local_store):
                 if existing and existing <= value:
                     continue
             merged[pid][field] = value
+        for field in _LOCAL_FILLS:
+            if field in local and field not in merged[pid]:
+                merged[pid][field] = local[field]
     return merged
 
 

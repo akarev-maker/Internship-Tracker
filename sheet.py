@@ -109,7 +109,9 @@ def _locations_from(location_str):
 
 def _parse_values(values):
     """One worksheet's raw rows -> ([records], {id: {status, notes}})."""
-    if not values:
+    # A blank header row means an empty worksheet (a freshly created Archive
+    # tab reads back as [[]] rather than []), not a mangled one — say nothing.
+    if not values or not any(h.strip() for h in values[0]):
         return [], {}
     header = values[0]
     if "ID" not in header:
