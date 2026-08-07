@@ -1,6 +1,6 @@
 # 🎯 Internship Tracker
 
-Tracks cybersecurity internships over time and keeps a **live Google Sheet**,
+Tracks internships over time and keeps a **live Google Sheet**,
 ranked so the top rows are the ones to **apply to first** — weighted toward how
 well each role matches *your* skillset, how soon it closes, and whether it's in
 Massachusetts / remote.
