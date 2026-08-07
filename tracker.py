@@ -14,7 +14,7 @@ import scoring
 import sheet
 import sources
 from user_profile import load_profile
-from store import load_store, merge_postings, rehydrate, save_store
+from store import load_store, merge_postings, purge_records, rehydrate, save_store
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger("tracker")
@@ -44,14 +44,18 @@ def main():
     # over the re-fetched posting rather than being overwritten by it.
     sheet.apply_sheet_edits(store, edits)
 
+    # 4b) drop listings whose season has passed (see sources.WANTED_TERMS).
+    # After the edits, so a status set in the sheet protects its record.
+    purged = purge_records(store, sources.stale_listing)
+
     # 5) score + rank.
     scoring.score_store(store, prof)
     save_store(store)
 
     # 6) rewrite the ranked sheet (and the archive tab).
     sheet.write_sheet(store, worksheet, archive)
-    logger.info("Done — %d tracked, %d new, %d restored from the Sheet.",
-                len(store), len(new_ids), restored)
+    logger.info("Done — %d tracked, %d new, %d restored from the Sheet, "
+                "%d purged.", len(store), len(new_ids), restored, purged)
 
 
 if __name__ == "__main__":

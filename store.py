@@ -108,6 +108,23 @@ def archived_records(store):
     return [r for r in store.values() if r.get("status") in HIDDEN_STATUSES]
 
 
+def purge_records(store, drop):
+    """Delete records matching drop(rec). Returns how many were deleted.
+
+    Only untouched records ("new") are eligible: anything the user has set a
+    status on is their pipeline history and is never purged automatically,
+    even when its season has passed. Runs after the sheet edits are applied,
+    so a status set this very run also protects its record.
+    """
+    doomed = [pid for pid, rec in store.items()
+              if rec.get("status") == "new" and drop(rec)]
+    for pid in doomed:
+        del store[pid]
+    if doomed:
+        logger.info("Purged %d stale posting(s)", len(doomed))
+    return len(doomed)
+
+
 def rehydrate(store, records):
     """Restore records the store is missing. Returns how many were restored.
 
@@ -115,8 +132,8 @@ def rehydrate(store, records):
     7 days without a hit and vanishes entirely if the repo is recreated. The
     Google Sheet is what actually survives, so each run reads the Sheet back
     into records and fills whatever the cache lost. Existing entries are never
-    touched — the cache's copy is richer (it keeps `term`, `date_posted` and
-    the cached Gemini fit, none of which are Sheet columns).
+    touched — the cache's copy is richer (it keeps `date_posted` and the
+    cached Gemini fit, which are not Sheet columns).
 
     Must run *before* merge_postings, so a restored posting keeps its real
     first_seen instead of being re-added as new with today's date.

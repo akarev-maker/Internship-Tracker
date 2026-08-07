@@ -135,7 +135,7 @@ def test_round_trip_preserves_durable_fields():
     back = sheet.read_store_from_sheet(FakeWS(_written(ws)))
     assert len(back) == 1
     got = back[0]
-    for field in ("id", "title", "company", "location_str", "deadline",
+    for field in ("id", "title", "company", "location_str", "term", "deadline",
                   "status", "notes", "source", "link", "first_seen"):
         assert got[field] == rec[field], f"{field} did not survive the round trip"
     assert got["rank"] == 0, "rank must be recomputed from the Location cell"
