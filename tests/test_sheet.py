@@ -161,6 +161,15 @@ def test_read_back_without_id_column_returns_nothing():
     assert records == [] and edits == {}
 
 
+def test_empty_worksheet_is_not_a_mangled_header(caplog):
+    """A freshly created Archive tab reads back as [[]]. That is an empty
+    sheet, not a broken one — warning about lost edits would be a lie."""
+    for values in ([], [[]], [["", "  ", ""]]):
+        records, edits = sheet.read_sheet_state(FakeWS(values))
+        assert records == [] and edits == {}
+    assert "missing the ID column" not in caplog.text
+
+
 def test_read_back_defaults_unknown_status_to_new():
     header = list(sheet.COLUMNS)
     row = [""] * len(header)

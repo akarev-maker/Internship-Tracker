@@ -54,6 +54,19 @@ def test_blank_local_values_do_not_clobber_the_sheet():
     assert merged["a"]["notes"] == "from sheet"
 
 
+def test_cached_gemini_fit_is_carried_over():
+    """The Sheet has no fit columns, so there is nothing to lose a contest
+    with — dropping a cached Gemini score would just re-spend the budget."""
+    local = _local("a")
+    local.update({"fit_score": 88, "fit_reason": "strong offensive match",
+                  "fit_hash": "abc123", "fit_source": "gemini",
+                  "term": "Summer 2027"})
+    merged = merge([_sheet_rec("a")], {"a": local})
+    assert merged["a"]["fit_score"] == 88
+    assert merged["a"]["fit_source"] == "gemini"
+    assert merged["a"]["term"] == "Summer 2027"
+
+
 def test_union_includes_both_sides():
     merged = merge([_sheet_rec("a")], {"b": _local("b")})
     assert set(merged) == {"a", "b"}
