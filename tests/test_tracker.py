@@ -102,6 +102,31 @@ def test_ingested_links_are_sanitized(monkeypatch):
     assert all(p["link"] == "" for p in posts), "the javascript: URL must be dropped"
 
 
+def test_status_edits_survive_an_empty_store(monkeypatch):
+    """The store lives in the Actions cache, so a cache miss hands main() an
+    empty dict and merge_postings re-adds every posting as "new". The Sheet is
+    then the only surviving record of status, so its edits must be applied
+    *after* the merge — applying them before would silently drop them."""
+    import tracker  # noqa: PLC0415
+
+    saved = {}
+    monkeypatch.setattr(tracker, "load_profile",
+                        lambda: {"weights": {}, "resume": "", "version": "v"})
+    monkeypatch.setattr(tracker, "load_store", lambda: {})  # cache miss
+    monkeypatch.setattr(tracker, "save_store", lambda s: saved.update(s))
+    monkeypatch.setattr(tracker.sheet, "open_worksheet", lambda: object())
+    monkeypatch.setattr(tracker.sheet, "read_status_from_sheet",
+                        lambda ws: {"a": "applied"})
+    monkeypatch.setattr(tracker.sheet, "write_sheet", lambda store, ws: None)
+    monkeypatch.setattr(tracker.sources, "fetch_all_postings",
+                        lambda: [_posting("a")])
+    monkeypatch.setattr(tracker.scoring, "score_store", lambda store, prof: None)
+
+    tracker.main()
+
+    assert saved["a"]["status"] == "applied", "the Sheet's status was lost"
+
+
 def test_usajobs_queries_tuned():
     assert ("cybersecurity intern", None) in sources.USAJOBS_QUERIES
     assert ("information security intern", None) in sources.USAJOBS_QUERIES
